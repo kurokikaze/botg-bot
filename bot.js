@@ -86,7 +86,7 @@ const defaultCommand = new Command('WAIT');
 const evaluateLoot = (item) => item.damage * 3 + item.movespeed + item.maxHealth * 2;
 
 var stored_potions = [];
-const lifeThreshold = 0.4;
+const lifeThreshold = 0.1;
 
 // game loop
 while (true) {
@@ -218,7 +218,7 @@ while (true) {
                     }
                 } else {
                     if (dist(myHero, myTower) > myTower.attackRange - 20) {
-                        command = new Command('MOVE', myTower.x, myTower.y);
+                        command = new Command('MOVE', myTower.x + 20, myTower.y);
                     } else {
                         if (heroInRange) {
                             command = new Command('ATTACK_NEAREST', 'HERO');
