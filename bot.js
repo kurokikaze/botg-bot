@@ -42,7 +42,18 @@ var itemCount = parseInt(readline()); // useful from wood2
 const items = [];
 for (var i = 0; i < itemCount; i++) {
     var inputs = readline().split(' ');
-    var [ itemName, itemCost, damage, health, maxHealth, mana, maxMana, moveSpeed, manaRegeneration, isPotion ] = [ ...inputs ];
+    var [ 
+        itemName,
+        itemCost,
+        damage,
+        health,
+        maxHealth,
+        mana,
+        maxMana,
+        moveSpeed,
+        manaRegeneration,
+        isPotion
+    ] = [ ...inputs ];
     /*var itemName = ; // contains keywords such as BRONZE, SILVER and BLADE, BOOTS connected by "_" to help you sort easier
     var itemCost = parseInt(inputs[1]); // BRONZE items have lowest cost, the most expensive items are LEGENDARY
     var damage = parseInt(inputs[2]); // keyword BLADE is present if the most important item stat is damage
