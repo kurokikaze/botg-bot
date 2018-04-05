@@ -1,7 +1,3 @@
-/**
- * Made with love by AntiSquid, Illedan and Wildum.
- * You can help children learn to code while you participate by donating to CoderDojo.
- **/
 function es6uniq(arrArg) {
 return arrArg.filter((elem, pos, arr) => {
     return arr.indexOf(elem) == pos;
@@ -54,16 +50,7 @@ for (var i = 0; i < itemCount; i++) {
         manaRegeneration,
         isPotion
     ] = [ ...inputs ];
-    /*var itemName = ; // contains keywords such as BRONZE, SILVER and BLADE, BOOTS connected by "_" to help you sort easier
-    var itemCost = parseInt(inputs[1]); // BRONZE items have lowest cost, the most expensive items are LEGENDARY
-    var damage = parseInt(inputs[2]); // keyword BLADE is present if the most important item stat is damage
-    var health = parseInt(inputs[3]);
-    var maxHealth = parseInt(inputs[4]);
-    var mana = parseInt(inputs[5]);
-    var maxMana = parseInt(inputs[6]);
-    var moveSpeed = parseInt(inputs[7]); // keyword BOOTS is present if the most important item stat is moveSpeed
-    var manaRegeneration = parseInt(inputs[8]);
-    var isPotion = parseInt(inputs[9]); // 0 if it's not instantly consumed*/
+
     items.push({
         itemName: inputs[0],
         itemCost: parseInt(inputs[1]),
@@ -94,6 +81,7 @@ const dist = (a, b) => Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2)
 var command = null;
 
 const storedItems = [];
+const defaultCommand = new Command('WAIT');
 
 const evaluateLoot = (item) => item.damage * 3 + item.movespeed + item.maxHealth * 2;
 
@@ -136,11 +124,8 @@ while (true) {
         });
     }
     
-    command = new Command('WAIT');
+    command = defaultCommand;
 
-    // Write an action using print()
-    // To debug: printErr('Debug messages...');    
-    
     const enemyHero = units.find(u => u.team != myTeam && u.unitType === 'HERO');
     const myTower = units.find(u => u.team == myTeam && u.unitType === 'TOWER');
     const enemyTower = units.find(u => u.team != myTeam && u.unitType === 'TOWER');
@@ -150,18 +135,22 @@ while (true) {
 
     printErr('RoundType', roundType);
     if (roundType === -2) {
-        print('IRONMAN');
-    } else if (roundType === -1) {
         print('DOCTOR_STRANGE');
+    } else if (roundType === -1) {
+        print('HULK');
     } else {
         printErr('units', units.length, 'my heroes', myHeroes.length);
         
         for (var myHeroId in myHeroes) {
+
             myHero = myHeroes[myHeroId];
             const heroInRange = (myHero && enemyHero) ? dist(myHero, enemyHero) <= myHero.attackRange : false;
             const unitsInRange = enemyTroops.map(unit => ({...unit, range: dist(myHero, unit)})).filter(unit => unit.range <= myHero.attackRange);
+
             printErr('Units in range:', unitsInRange.length, 'myX', myHero.x)
-            if (!heroInRange && unitsInRange.length == 0 && myTroops) {
+            printErr('My tower:', myTower.x, myTower.y)
+
+            if (!heroInRange && unitsInRange.length == 0 && myTroops.length > 0) {
                 const purchasable = items.filter(i => i.itemCost <= gold && !i.isPotion).filter(i => storedItems.findIndex(si => si.name == i.itemName) == -1);
                 const lootRating = purchasable.map(i => ({ name: i.itemName, rating: evaluateLoot(i)}));
                 lootRating.sort((a,b) => a.rating >= b.rating);
@@ -169,7 +158,7 @@ while (true) {
                     command = new Command('BUY', lootRating[0].name);
                     command.addAction(() => storedItems.push(lootRating[0]));
                 } else {
-                    if (myTroops) {
+                    if (myTroops.length > 0) {
                         const avgX = median(myTroops.map(u => u.x));
                         const avgY = Math.floor(myTroops.map(u => u.y).reduce( ( p, c ) => p + c, 0 ) / myTroops.length);
                         if (dist({x: avgX, y: avgY}, enemyTower) > enemyTower.attackRange) {
@@ -198,6 +187,8 @@ while (true) {
                     command = new Command('ATTACK_NEAREST', 'TOWER');
                 } else if (heroInRange) {
                     command = new Command('ATTACK_NEAREST', 'HERO');
+                } else {
+                    command = new Command('ATTACK_NEAREST', 'HERO');
                 }
             }
             
@@ -208,9 +199,9 @@ while (true) {
             const myHeroPercentage = myHero.health / myHero.maxHealth;
             const enemyHeroPercentage = enemyHero ? (enemyHero.health / enemyHero.maxHealth) : 100;
             
-            if (unitsTooClose.length > 1 || heroTooClose || !myTroops) {
+            /*if (unitsTooClose.length > 1 || heroTooClose || !myTroops) {
                 command = new Command('MOVE', myTower.x, myTower.y);
-            }
+            }*/
             
             if (myHeroPercentage <= lifeThreshold) {
                 const healthPotionsForSale = items.filter(i => i.itemCost <= gold && i.isPotion && i.health);
@@ -226,10 +217,14 @@ while (true) {
                         command = new Command('BUY', healthPotionsForSale[0].itemName);
                     }
                 } else {
-                    if (myHero.percentage <= 0.2) {
-                        command = new Command('MOVE', myTower.x - 20, myTower.y - 250);
-                    } else {
+                    if (dist(myHero, myTower) > myTower.attackRange - 20) {
                         command = new Command('MOVE', myTower.x, myTower.y);
+                    } else {
+                        if (heroInRange) {
+                            command = new Command('ATTACK_NEAREST', 'HERO');
+                        } else {
+                            command = new Command('WAIT');
+                        }
                     }
                 }
             }
