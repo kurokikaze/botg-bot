@@ -4,11 +4,15 @@
   "description": "Simple bot for CodinGame",
   "main": "bot.js",
   "dependencies": {
-    "jest": "^22.4.3"
+    "ramda": "^0.25.0"
   },
   "devDependencies": {
+    "babel": "^6.23.0",
+    "babel-preset-env": "^1.6.1",
+    "eslint": "^4.0.0",
     "eslint-config-airbnb-base": "^12.1.0",
-    "eslint-plugin-import": "^2.10.0"
+    "eslint-plugin-import": "^2.10.0",
+    "jest": "^22.4.3"
   },
   "scripts": {
     "test": "jest"
