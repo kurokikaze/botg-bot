@@ -1,21 +1,24 @@
 function es6uniq(arrArg) {
-return arrArg.filter((elem, pos, arr) => {
-    return arr.indexOf(elem) == pos;
-});
+    return arrArg.filter((elem, pos, arr) => {
+        return arr.indexOf(elem) == pos;
+    });
 }
 
 class Command {
-    constructor(type, param1 = null, param2 = null) {
+    constructor(type, param1 = null, param2 = null, comment = '') {
         this.type = type;
         this.param1 = param1 || '';
         this.param2 = param2 || '';
+        this.comment = comment;
     }	
 }
 
 Command.prototype.generate = function() { 
     if (this.action) this.action();
-    return [ this.type, this.param1.toString(), this.param2.toString()].filter(Boolean).join(' ') 
+    const commandBody = [ this.type, this.param1.toString(), this.param2.toString()].filter(Boolean).join(' ')
+    return this.comment ? commandBody + '; ' + this.comment : commandBody;
 }
+
 Command.prototype.addAction = function(callback) { this.action = callback; }
 
 var myTeam = parseInt(readline());
@@ -34,7 +37,9 @@ for (var i = 0; i < bushAndSpawnPointCount; i++) {
         radius
     );
 }
+
 var itemCount = parseInt(readline()); // useful from wood2
+
 const items = [];
 for (var i = 0; i < itemCount; i++) {
     var inputs = readline().split(' ');
@@ -72,11 +77,20 @@ const median = (values = []) => {
     return (values[lowMiddle] + values[highMiddle]) / 2;
 }
 
-const mine = u => u.team === 0;
-const enemy = u => u.team === 1;
-const isHero = u => u.type === 'HERO';
+// func flavor
+const combine = (f1, f2) => (t) => f1(t) && f2(t);
+const not = (fn) => function() { return !fn.apply(null, arguments) };
+
+const mine = u => u.team === myTeam;
+const enemy = not(mine);
+
+const isHero = u => u.unitType === 'HERO';
+const isUnit = u => u.unitType === 'UNIT';
+const isTower = u => u.unitType === 'TOWER';
 
 const dist = (a, b) => Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2))
+const rightmost = objects => objects.length > 0 ? objects.reduce((o1, best) => o1.x > best ? o2.x : best, objects[0].x) : null;
+const leftmost = objects => objects.length > 0 ? objects.reduce((o1, best) => o1.x < best ? o2.x : best, objects[0].x) : null;
 
 var command = null;
 
@@ -86,7 +100,36 @@ const defaultCommand = new Command('WAIT');
 const evaluateLoot = (item) => item.damage * 3 + item.movespeed + item.maxHealth * 2;
 
 var stored_potions = [];
-const lifeThreshold = 0.1;
+const defaultLifeThreshold = 0.3;
+const pessimisticLifeThreshold = 0.5;
+
+const lifeCircle = (hero, units) => units.filter(u => dist(hero, u) <= 140).reduce((s, u) => s += u.health, 0)
+const skirmishLine = units => {
+    const myRightmost = rightmost(units.filter(mine))
+    const theirLeftmost = leftmost(units.filter(enemy))
+    return myRightmost + theirLeftmost / 2;
+}
+
+const isBush = f => f.entityType === 'BUSH';
+const findGoodBushes = skirmishLine => mapFeatures.filter(isBush).map(f => ({ ...f, dist: dist(f, {x: skirmishLine, y: myTower.y})}))
+
+const inMyRange = shooter => units => units.filter(unit => dist(shooter, unit) < shooter.attackRange)
+const inTheirRange = target => units => units.filter(unit => dist(target, unit) < unit.attackRange)
+
+const skirmishInProgress = units => {
+    const mineUnits = units.filter(combine(mine, isUnit))
+    const enemyUnits = units.filter(combine(mine, isUnit))
+
+    // Нет юнитов - нет схватки. Замес у башни не рассматриваем.
+    if (mineUnits.length === 0 || enemyUnits.length === 0) return false;
+
+    const weAreLeft = mineUnits[0].x < enemyUnits[0].x;
+
+    const ourAvantgarde = weAreLeft ? rightmost(mineUnits) : leftmost(mineUnits);
+    const enemyAvantgarde = weAreLeft ? leftmost(enemyUnits) : rightmost(enemyUnits);
+
+    return Math.abs(ourAvantgarde - enemyAvantgarde) <= 100;
+}
 
 // game loop
 while (true) {
@@ -126,29 +169,35 @@ while (true) {
     
     command = defaultCommand;
 
-    const enemyHero = units.find(u => u.team != myTeam && u.unitType === 'HERO');
-    const myTower = units.find(u => u.team == myTeam && u.unitType === 'TOWER');
-    const enemyTower = units.find(u => u.team != myTeam && u.unitType === 'TOWER');
-    const myHeroes = units.filter(u => u.team === myTeam && u.unitType === 'HERO');
-    const myTroops = units.filter(u => u.team == myTeam && u.unitType === 'UNIT' && u.health > 0 && u.isVisible);
-    const enemyTroops = units.filter(u => u.team != myTeam && u.unitType === 'UNIT' && u.health > 0 && u.isVisible);
+    const enemyHero = units.find(combine(enemy, isHero));
+    const myTower = units.find(combine(mine, isTower));
+    const enemyTower = units.find(combine(enemy, isTower));
+    const myHeroes = units.filter(combine(mine, isHero));
+    const myTroops = units.filter(combine(mine, isUnit));
+
+    const enemyTroops = units.filter(combine(enemy, isUnit));
+
+    const closingSign = u => Math.sign(myTower.x - u.x)
+    const closerToHome = (u, dist) => (u.x + closingSign(u) * dist);
+
+    const closestTo = center => (us) => us.map(iu => ({...iu, dist: dist(center, iu)})).sort(((a,b) => a.dist >= b.dist))
 
     printErr('RoundType', roundType);
     if (roundType === -2) {
         print('DOCTOR_STRANGE');
     } else if (roundType === -1) {
-        print('HULK');
+        print('IRONMAN');
     } else {
         printErr('units', units.length, 'my heroes', myHeroes.length);
         
         for (var myHeroId in myHeroes) {
 
             myHero = myHeroes[myHeroId];
-            const heroInRange = (myHero && enemyHero) ? dist(myHero, enemyHero) <= myHero.attackRange : false;
-            const unitsInRange = enemyTroops.map(unit => ({...unit, range: dist(myHero, unit)})).filter(unit => unit.range <= myHero.attackRange);
+            const heroInRange = myHero && enemyHero && (dist(myHero, enemyHero) <= myHero.attackRange);
+            const unitsInRange = inMyRange(myHero)(enemyTroops);
 
-            printErr('Units in range:', unitsInRange.length, 'myX', myHero.x)
-            printErr('My tower:', myTower.x, myTower.y)
+            printErr('Units in range:', unitsInRange.length)
+            //printErr('My tower:', myTower.x, myTower.y)
 
             if (!heroInRange && unitsInRange.length == 0 && myTroops.length > 0) {
                 const purchasable = items.filter(i => i.itemCost <= gold && !i.isPotion).filter(i => storedItems.findIndex(si => si.name == i.itemName) == -1);
@@ -159,15 +208,21 @@ while (true) {
                     command.addAction(() => storedItems.push(lootRating[0]));
                 } else {
                     if (myTroops.length > 0) {
-                        const avgX = median(myTroops.map(u => u.x));
-                        const avgY = Math.floor(myTroops.map(u => u.y).reduce( ( p, c ) => p + c, 0 ) / myTroops.length);
-                        if (dist({x: avgX, y: avgY}, enemyTower) > enemyTower.attackRange) {
-                            command = new Command('MOVE', avgX, avgY);
+                        const squad = {
+                            x : median(myTroops.map(u => u.x)), 
+                            y : Math.floor(myTroops.map(u => u.y).reduce( ( p, c ) => p + c, 0 ) / myTroops.length)
+                        };
+
+                        if (dist(squad, enemyTower) > enemyTower.attackRange) {
+                            if (inTheirRange(squad)(enemyTroops).length > 0) {
+                                const saferPosition = closerToHome(squad, dist(myHero, squad) / 2);
+                                command = new Command('MOVE', saferPosition, squad.y, 'FOLLOW SQUAD SAFELY');
+                            } else {
+                                command = new Command('MOVE', squad.x, squad.y, 'FOLLOW SQUAD');
+                            }                            
                         } else {
-                            command = new Command('MOVE', avgY, enemyTower.x - enemyTower.attackRange - 10);
+                            command = new Command('MOVE', closerToHome(enemyTower, enemyTower.attackRange + 10), squadY);
                         }
-                    } else {
-                        command = new Command('MOVE', enemyHero.x, enemyHero.y);
                     }
                 }
             } else {
@@ -175,13 +230,44 @@ while (true) {
                     const weakTarget = unitsInRange.sort((a, b) => a.health >= b.health)[0]
                     const enemyWeaklings = enemyTroops.map(unit => ({...unit, range: dist(myHero, unit)})).filter(unit => unit.range <= myHero.attackRange && unit.health <= myHero.attackDamage);
                     const weaklings = myTroops.map(unit => ({...unit, range: dist(myHero, unit)})).filter(unit => unit.range <= myHero.attackRange && unit.health <= myHero.attackDamage);
-    
+                    const skirmishLinePos = skirmishLine(units);
+                    const skirmishIsOn = skirmishInProgress(units);
+                    const goodBushes = findGoodBushes(skirmishLinePos).filter(f => f.dist <= myHero.attackRange);
+
+                    const closestBushes = closestTo(myHero)(mapFeatures.filter(isBush));
+
+                    skirmishIsOn && printErr('Skirmish in progress at', skirmishLinePos)
+
+                    const squadLife = lifeCircle(myHero, myTroops);
+
                     if (enemyWeaklings.length > 0) {
-                        command = new Command('MOVE_ATTACK', enemyWeaklings[0].unitId);
+                        command = new Command('ATTACK', enemyWeaklings[0].unitId);
                     } else if (weaklings.length > 0) { 
-                        command = new Command('MOVE_ATTACK', weaklings[0].unitId);
+                        command = new Command('ATTACK', weaklings[0].unitId);
                     } else {
                         command = new Command('ATTACK', weakTarget.unitId);
+                    }
+
+                    const safeSpot = (closestBushes.length > 0) ? closestBushes[0] : myTower;
+
+                    if (goodBushes.length > 0 && skirmishIsOn) {
+                        if (dist(myHero, goodBushes[0]) > 10) {
+                            command = new Command('MOVE', goodBushes.x, goodBushes.y, 'TO THE BUSH');
+                        }
+                    } else if (Math.abs(skirmishLinePos - myHero.x) < 100) {
+                        command = new Command('MOVE', closerToHome({x: skirmishLinePos}, 100), myHero.y, 'FROM SKIRMISH LINE');
+                    }
+
+                    if (squadLife <= 200 && myTroops.length > 0) {
+                        if (myTroops.length > 0) {
+                            const squadX = median(myTroops.filter(unit => dist(myHero, unit) > 140).map(u => u.x));
+                            const squadY = Math.floor(myTroops.map(u => u.y).reduce( ( p, c ) => p + c, 0 ) / myTroops.length);
+                            if (dist(myHero, {x: squadX, y: squadY}) > 50) {
+                                command = new Command('MOVE', safeSpot.x, safeSpot.y, 'LEAVING SQUAD WITH ' + squadLife + ' HP');
+                            }
+                        } else {
+                            command = new Command('MOVE', safeSpot.x, safeSpot.y, 'LEAVING SQUAD FOR SAFE SPOT');
+                        }
                     }
                 } else if (dist(myHero, enemyTower) <= myHero.attackRange) {
                     command = new Command('ATTACK_NEAREST', 'TOWER');
@@ -192,7 +278,6 @@ while (true) {
                 }
             }
             
-            
             const unitsTooClose = enemyTroops.map(unit => dist(myHero, unit)).filter(range => range <= 100);
             const heroTooClose = enemyHero ? dist(myHero, enemyHero) <= 100 : false;
             
@@ -202,6 +287,8 @@ while (true) {
             /*if (unitsTooClose.length > 1 || heroTooClose || !myTroops) {
                 command = new Command('MOVE', myTower.x, myTower.y);
             }*/
+
+            const lifeThreshold = (enemyHero && enemyHero.heroType === 'HULK') ? pessimisticLifeThreshold : defaultLifeThreshold;
             
             if (myHeroPercentage <= lifeThreshold) {
                 const healthPotionsForSale = items.filter(i => i.itemCost <= gold && i.isPotion && i.health);
@@ -211,14 +298,14 @@ while (true) {
                         const lowestItem = storedItems[0];
                         command = new Command('SELL', lowestItem.name);
                         command.addAction(() => {
-                            storedItems.unshift();
+                            storedItems.shift();
                         })
                     } else {
                         command = new Command('BUY', healthPotionsForSale[0].itemName);
                     }
                 } else {
-                    if (dist(myHero, myTower) > myTower.attackRange - 20) {
-                        command = new Command('MOVE', myTower.x + 20, myTower.y);
+                    if (dist(myHero, myTower) > 20) {
+                        command = new Command('MOVE', myTower.x + 20, myTower.y, 'TO TOWER');
                     } else {
                         if (heroInRange) {
                             command = new Command('ATTACK_NEAREST', 'HERO');
