@@ -1,0 +1,30 @@
+{
+  "name": "kurokikaze-botg-bot",
+  "version": "0.1.0",
+  "description": "Simple bot for CodinGame",
+  "main": "bot.js",
+  "dependencies": {
+    "jest": "^22.4.3"
+  },
+  "devDependencies": {
+    "eslint-config-airbnb-base": "^12.1.0",
+    "eslint-plugin-import": "^2.10.0"
+  },
+  "scripts": {
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kurokikaze/botg-bot.git"
+  },
+  "keywords": [
+    "ai",
+    "bots"
+  ],
+  "author": "kurokikaze",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/kurokikaze/botg-bot/issues"
+  },
+  "homepage": "https://github.com/kurokikaze/botg-bot#readme"
+}

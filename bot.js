@@ -4,13 +4,18 @@ function es6uniq(arrArg) {
     });
 }
 
+const actionType = {
+    initialData: 'initialData',
+    tickUpdate: 'tickUpdate',
+}
+
 class Command {
     constructor(type, param1 = null, param2 = null, comment = '') {
         this.type = type;
         this.param1 = param1 || '';
         this.param2 = param2 || '';
         this.comment = comment;
-    }	
+    }
 }
 
 Command.prototype.generate = function() { 
@@ -21,55 +26,76 @@ Command.prototype.generate = function() {
 
 Command.prototype.addAction = function(callback) { this.action = callback; }
 
-var myTeam = parseInt(readline());
-var bushAndSpawnPointCount = parseInt(readline()); // usefrul from wood1, represents the number of bushes and the number of places where neutral units can spawn
-const mapFeatures = []
-for (var i = 0; i < bushAndSpawnPointCount; i++) {
-    var inputs = readline().split(' ');
-    var entityType = inputs[0]; // BUSH, from wood1 it can also be SPAWN
-    var x = parseInt(inputs[1]);
-    var y = parseInt(inputs[2]);
-    var radius = parseInt(inputs[3]);
-    mapFeatures.push(
-        entityType,
-        x,
-        y,
-        radius
-    );
+var store = {};
+
+const update = (state, action) => reducer(state, action)
+
+const reducer = (state, action) => {
+    switch (action.type) {
+        case actionType.initialData: {
+            return state.extend({
+                config: {
+                    myTeam: action.myTeam
+                },
+                items: action.items,
+                mapFeatures: action.mapFeatures,
+            })
+        }
+    }
 }
 
-var itemCount = parseInt(readline()); // useful from wood2
+const readSetup = () => {
+    var myTeam = parseInt(readline());
+    var bushAndSpawnPointCount = parseInt(readline()); // usefrul from wood1, represents the number of bushes and the number of places where neutral units can spawn
+    const mapFeatures = []
+    for (var i = 0; i < bushAndSpawnPointCount; i++) {
+        var inputs = readline().split(' ');
+        var entityType = inputs[0]; // BUSH, from wood1 it can also be SPAWN
+        var x = parseInt(inputs[1]);
+        var y = parseInt(inputs[2]);
+        var radius = parseInt(inputs[3]);
+        mapFeatures.push(
+            entityType,
+            x,
+            y,
+            radius
+        );
+    }
+    
+    var itemCount = parseInt(readline()); // useful from wood2
+    
+    const items = [];
+    for (var i = 0; i < itemCount; i++) {
+        var inputs = readline().split(' ');
 
-const items = [];
-for (var i = 0; i < itemCount; i++) {
-    var inputs = readline().split(' ');
-    var [ 
-        itemName,
-        itemCost,
-        damage,
-        health,
-        maxHealth,
-        mana,
-        maxMana,
-        moveSpeed,
-        manaRegeneration,
-        isPotion
-    ] = [ ...inputs ];
+        items.push({
+            itemName: inputs[0],
+            itemCost: parseInt(inputs[1]),
+            damage: parseInt(inputs[2]),
+            health: parseInt(inputs[3]),
+            maxHealth: parseInt(inputs[4]),
+            mana: parseInt(inputs[5]),
+            maxMana: parseInt(inputs[6]),
+            moveSpeed: parseInt(inputs[7]),
+            manaRegeneration: parseInt(inputs[8]),
+            isPotion: parseInt(inputs[9])
+        })
+    }
 
-    items.push({
-        itemName: inputs[0],
-        itemCost: parseInt(inputs[1]),
-        damage: parseInt(inputs[2]),
-        health: parseInt(inputs[3]),
-        maxHealth: parseInt(inputs[4]),
-        mana: parseInt(inputs[5]),
-        maxMana: parseInt(inputs[6]),
-        moveSpeed: parseInt(inputs[7]),
-        manaRegeneration: parseInt(inputs[8]),
-        isPotion: parseInt(inputs[9])
-    })
+    return {
+        type: actionType.initialData,
+        myTeam,
+        mapFeatures,
+        items
+    }
 }
 
+const setupAction = readSetup();
+store = update(store, setupAction);
+
+var { myTeam, mapFeatures, items } = { ...setupAction }
+
+// Math stuff
 const median = (values = []) => {
     values.sort((a, b) => a - b);
     let lowMiddle = Math.floor((values.length - 1) / 2);
@@ -92,16 +118,7 @@ const dist = (a, b) => Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2)
 const rightmost = objects => objects.length > 0 ? objects.reduce((o1, best) => o1.x > best ? o2.x : best, objects[0].x) : null;
 const leftmost = objects => objects.length > 0 ? objects.reduce((o1, best) => o1.x < best ? o2.x : best, objects[0].x) : null;
 
-var command = null;
-
-const storedItems = [];
-const defaultCommand = new Command('WAIT');
-
 const evaluateLoot = (item) => item.damage * 3 + item.movespeed + item.maxHealth * 2;
-
-var stored_potions = [];
-const defaultLifeThreshold = 0.3;
-const pessimisticLifeThreshold = 0.5;
 
 const lifeCircle = (hero, units) => units.filter(u => dist(hero, u) <= 140).reduce((s, u) => s += u.health, 0)
 const skirmishLine = units => {
@@ -130,6 +147,13 @@ const skirmishInProgress = units => {
 
     return Math.abs(ourAvantgarde - enemyAvantgarde) <= 100;
 }
+
+var command = null;
+const storedItems = [];
+const defaultCommand = new Command('WAIT');
+var stored_potions = [];
+const defaultLifeThreshold = 0.3;
+const pessimisticLifeThreshold = 0.5;
 
 // game loop
 while (true) {
