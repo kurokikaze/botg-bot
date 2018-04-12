@@ -33,21 +33,21 @@ class Command {
         this.param2 = param2 || '';
         this.comment = comment;
     }
+
+    generate() {
+        if (this.action) this.action();
+
+        const commandBody = [
+            this.type,
+            this.param1.toString(),
+            this.param2.toString(),
+        ].filter(Boolean).join(' ');
+
+        return this.comment ? `${commandBody}; ${this.comment}` : commandBody;
+    }
+
+    addAction(callback) { this.action = callback; }
 }
-
-Command.prototype.generate = function generate() {
-    if (this.action) this.action();
-
-    const commandBody = [
-        this.type,
-        this.param1.toString(),
-        this.param2.toString(),
-    ].filter(Boolean).join(' ');
-
-    return this.comment ? `${commandBody}; ${this.comment}` : commandBody;
-};
-
-Command.prototype.addAction = function addAction(callback) { this.action = callback; };
 
 const reducer = (state, action) => {
     switch (action.type) {
@@ -61,14 +61,6 @@ const reducer = (state, action) => {
         });
     }
     case actionType.tickUpdate: {
-        /*
-        {
-            gold,
-            enemyGold,
-            roundType,
-            units,
-        }
-        */
         return {
             ...state,
             game: {
@@ -97,7 +89,7 @@ const reducer = (state, action) => {
 const update = (state, action) => reducer(state, action);
 
 // Readers
-const readSetup = () => {
+const readSetup = ({ readline }) => {
     const myTeam = parseInt(readline(), 10);
     // useful from wood1, represents the number of bushes and the number
     // of places where neutral units can spawn
@@ -105,16 +97,17 @@ const readSetup = () => {
     const mapFeatures = [];
     for (let i = 0; i < bushAndSpawnPointCount; i += 1) {
         const inputs = readline().split(' ');
+        // eslint-disable-next-line no-shadow
         const entityType = inputs[0]; // BUSH, from wood1 it can also be SPAWN
         const x = parseInt(inputs[1], 10);
         const y = parseInt(inputs[2], 10);
         const radius = parseInt(inputs[3], 10);
-        mapFeatures.push(
+        mapFeatures.push({
             entityType,
             x,
             y,
             radius,
-        );
+        });
     }
 
     const itemCount = parseInt(readline(), 10); // useful from wood2
@@ -145,7 +138,7 @@ const readSetup = () => {
     };
 };
 
-const readTurnData = () => {
+const readTurnData = ({ readline }) => {
     const gold = parseInt(readline(), 10);
     const enemyGold = parseInt(readline(), 10);
     const roundType = parseInt(readline(), 10);
@@ -197,6 +190,13 @@ const median = (values = []) => {
     return (values[lowMiddle] + values[highMiddle]) / 2;
 };
 
+const inDirection = (center, target, distance) => {
+    const angle = Math.atan(target.y - center.y, target.x - center.x);
+    const x = Math.round(center.x + (distance * Math.cos(angle)));
+    const y = Math.round(center.y + (distance * Math.sin(angle)));
+    return { x, y };
+};
+
 // func flavor
 const combine = (f1, f2) => t => f1(t) && f2(t);
 
@@ -216,7 +216,7 @@ const lcoord = objects => objects.reduce((o1, best) => (o1.x < best ? o1.x : bes
 const rightmost = objects => (objects.length > 0 ? rcoord(objects) : null);
 const leftmost = objects => (objects.length > 0 ? lcoord(objects) : null);
 
-const evaluateLoot = item => ((item.damage * 3) + item.movespeed + (item.maxHealth * 2));
+const evaluateLoot = item => ((item.damage * 3) + (item.maxHealth * 2));
 
 const lifeCircle = (hero, units) => units.filter(u =>
     dist(hero, u) <= 140).reduce((s, u) => s + u.health, 0);
@@ -242,6 +242,7 @@ const closestTo = center =>
 const inMyRange = shooter =>
     units => units.filter(unit => dist(shooter, unit) < shooter.attackRange);
 
+// eslint-disable-next-line no-unused-vars
 const inTheirRange = target =>
     units => units.filter(unit => dist(target, unit) < unit.attackRange);
 
@@ -262,7 +263,6 @@ const skirmishInProgress = (units) => {
 
 let command = null;
 const storedItems = [];
-// const defaultCommand = new Command('WAIT');
 const defaultLifeThreshold = 0.3;
 const pessimisticLifeThreshold = 0.5;
 
@@ -345,7 +345,15 @@ const generateCommands = (gameData) => {
                 command = new Command('ATTACK', weaklings[0].unitId, null, 'WEAKLING');
             } else {
                 const targetDist = dist(myHero, weakTarget);
-                if (targetDist <= myHero.attackRange) {
+                if (
+                    myHero.heroType === 'IRONMAN' &&
+                    myHero.mana >= 50 &&
+                    myHero.countDown3 === 0 &&
+                    targetDist <= 250 &&
+                    targetDist > 100
+                ) {
+                    command = new Command('BURNING', weakTarget.x, weakTarget.y, 'BURNING');
+                } else if (targetDist <= myHero.attackRange) {
                     command = new Command('ATTACK', weakTarget.unitId, null, `GENERAL TARGET (${Math.floor(targetDist)}, ${myHero.attackRange}, ${weakTarget.health})`);
                 } else {
                     command = new Command('MOVE', weakTarget.x, weakTarget.y, 'CREEPING CLOSER');
@@ -397,7 +405,12 @@ const generateCommands = (gameData) => {
                     command = new Command('BUY', healthPotionsForSale[0].itemName);
                 }
             } else if (dist(myHero, gameData.prism.myTower) > 20) {
-                command = new Command('MOVE', gameData.prism.myTower.x + 20, gameData.prism.myTower.y, 'TO TOWER');
+                if (myHero.heroType === 'IRONMAN' && myHero.mana > 16 && myHero.countDown1 === 0) {
+                    const blinkPoint = inDirection(myHero, gameData.prism.myTower, 199);
+                    command = new Command('BLINK', blinkPoint.x + 20, blinkPoint.y, ' BLINK TO TOWER');
+                } else {
+                    command = new Command('MOVE', gameData.prism.myTower.x + 20, gameData.prism.myTower.y, 'TO TOWER');
+                }
             } else if (heroInRange) {
                 command = new Command('ATTACK_NEAREST', 'HERO');
             } else {
@@ -411,12 +424,13 @@ const generateCommands = (gameData) => {
 };
 
 // game loop
-const player = (initialStore) => {
+// eslint-disable-next-line no-unused-vars
+const player = (initialStore, reader) => {
     // eslint-disable-next-line no-var
     var playerStore = initialStore;
     // eslint-disable-next-line no-constant-condition
     while (true) {
-        const turnAction = readTurnData();
+        const turnAction = readTurnData(reader);
         playerStore = update(playerStore, turnAction);
 
         const transformedStore = transformPrism(playerStore);
@@ -425,15 +439,17 @@ const player = (initialStore) => {
     }
 };
 
-// const setupAction = readSetup();
+// const setupAction = readSetup({ readline });
 // store = update(store, setupAction);
 
-// player(store);
+//player(store, { readline });
 
 export default {
+    actionType,
     createMine,
     not,
     combine,
+    readSetup,
     readTurnData,
     transformPrism,
     generateCommands,
