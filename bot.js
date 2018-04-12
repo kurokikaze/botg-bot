@@ -20,6 +20,7 @@ const unitType = {
     hero: 'HERO',
     unit: 'UNIT',
     tower: 'TOWER',
+    groot: 'GROOT',
 };
 
 const entityType = {
@@ -290,6 +291,27 @@ const transformPrism = (originalStore) => {
     };
 };
 
+const ironmanPrism = (state, myHero) => {
+    const isGroot = u => u.unitType === unitType.groot;
+    const enemyIsCloser = (unit) => {
+        const enemyHeroes = closestTo(unit)(state.prism.enemyHeroes);
+        const myHeroes = closestTo(unit)(state.prism.myHeroes);
+        return enemyHeroes.length > 0 && myHeroes.length > 0 && enemyHeroes[0].dist < myHeroes[0].dist;
+    };
+
+    const grootsInReach = state.units.filter(isGroot).filter(gr => dist(myHero, gr) <= 900) || [];
+    const harrassTargets = grootsInReach.filter(enemyIsCloser);
+
+    const newState = {
+        ...state,
+        prism: {
+            ...state.prism,
+            harrassTargets,
+        },
+    };
+    return newState;
+};
+
 const generateCommands = (gameData) => {
     const closingSign = u => Math.sign(gameData.prism.myTower.x - u.x);
     const closerToHome = (u, distance) => (u.x + (closingSign(u) * distance));
@@ -304,6 +326,17 @@ const generateCommands = (gameData) => {
     const commands = gameData.prism.myHeroes.map((myHero) => {
         const heroInRange = (gameData.prism.enemyHeroes && gameData.prism.enemyHeroes.length > 0) ? inMyRange(myHero)(gameData.prism.enemyHeroes).length > 0 : false;
         const unitsInRange = (gameData.prism.enemyTroops && gameData.prism.enemyTroops.length > 0) ? inMyRange(myHero)(gameData.prism.enemyTroops) : [];
+
+        if (myHero.heroType === 'IRONMAN' &&
+            myHero.mana > 100 &&
+            myHero.countDown2 === 0
+        ) {
+            const prismedState = ironmanPrism(gameData, myHero);
+            if (prismedState.prism.harrassTargets.length > 0) {
+                const harrassTarget = closestTo(myHero)(prismedState.prism.harrassTargets)[0];
+                return (new Command('FIREBALL', harrassTarget.x, harrassTarget.y, 'HOW DO YOU LIKE THAT')).generate();
+            }
+        }
 
         if (!heroInRange && unitsInRange.length === 0 && gameData.prism.myTroops.length > 0) {
             const lootRating = gameData.prism.purchasable.map(i => ({ name: i.itemName, rating: evaluateLoot(i) }));
@@ -450,20 +483,20 @@ const player = (initialStore, reader) => {
     }
 };
 
-// const setupAction = readSetup({ readline });
-// store = update(store, setupAction);
+const setupAction = readSetup({ readline });
+store = update(store, setupAction);
 
-// player(store, { readline });
+player(store, { readline });
 
-export default {
-    actionType,
-    createMine,
-    not,
-    combine,
-    isHero,
-    readSetup,
-    readTurnData,
-    transformPrism,
-    generateCommands,
-    skirmishLine,
-};
+// export default {
+//     actionType,
+//     createMine,
+//     not,
+//     combine,
+//     isHero,
+//     readSetup,
+//     readTurnData,
+//     transformPrism,
+//     generateCommands,
+//     skirmishLine,
+// };

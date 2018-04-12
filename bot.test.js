@@ -324,5 +324,5 @@ describe('logic tests', () => {
         const [receivedCommands] = bot.generateCommands(bot.transformPrism(state));
 
         expect(receivedCommands).toEqual(defaultCommand, 'Received default command');
-    });    
+    });
 });
