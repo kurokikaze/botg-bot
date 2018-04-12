@@ -1,4 +1,5 @@
 /* global print, printErr, readline */
+// eslint-disable-next-line prefer-const
 let store = {
     config: {},
     game: {
@@ -268,11 +269,11 @@ const pessimisticLifeThreshold = 0.5;
 
 const transformPrism = (originalStore) => {
     const localMine = createMine(originalStore);
-    const localEnemy = not(mine);
+    const localEnemy = not(localMine);
     return {
         ...originalStore,
         prism: {
-            enemyHero: originalStore.units.find(combine(localMine, isHero)),
+            enemyHero: originalStore.units.find(combine(localEnemy, isHero)),
 
             myTower: originalStore.units.find(combine(localMine, isTower)),
             myHeroes: originalStore.units.filter(combine(localMine, isHero)),
@@ -330,7 +331,8 @@ const generateCommands = (gameData) => {
             }
         } else if (unitsInRange.length > 0) {
             const weakTarget = unitsInRange.sort((a, b) => a.health >= b.health)[0];
-            const enemyWeaklings = gameData.prism.enemyTroops.map(unit => ({ ...unit, range: dist(myHero, unit) })).filter(unit => unit.range <= myHero.attackRange && unit.health <= myHero.attackDamage);
+            const enemyWeaklings = inMyRange(myHero)(gameData.prism.enemyTroops);
+            // const enemyWeaklings = gameData.prism.enemyTroops.map(unit => ({ ...unit, range: dist(myHero, unit) })).filter(inRangeAndWeak);
             const weaklings = gameData.prism.myTroops.map(unit => ({ ...unit, range: dist(myHero, unit) })).filter(unit => unit.range <= myHero.attackRange && unit.health <= myHero.attackDamage);
 
             const closestBushes = closestTo(myHero)(gameData.mapFeatures.filter(isBush));
@@ -377,10 +379,19 @@ const generateCommands = (gameData) => {
                     command = new Command('MOVE', safeSpot.x, safeSpot.y, 'LEAVING SQ FOR SAFE SPOT');
                 }
             }
-        } else if (dist(myHero, gameData.prism.enemyTower) <= myHero.attackRange) {
-            command = new Command('ATTACK_NEAREST', 'TOWER');
         } else if (heroInRange) {
-            command = new Command('ATTACK_NEAREST', 'HERO', null, 'CHAAAARGE');
+            const pullTarget = inMyRange(myHero)(gameData.prism.enemyHeroes)[0];
+
+            if (
+                myHero.heroType === 'DOCTOR_STRANGE' &&
+                myHero.mana > 50 &&
+                myHero.countDown3 === 0 &&
+                dist(myHero, pullTarget) <= 400
+            ) {
+                command = new Command('PULL', pullTarget.unitId, null, 'GET OVER HERE');
+            } else {
+                command = new Command('ATTACK_NEAREST', 'HERO', null, 'CHAAAARGE');
+            }
         } else {
             command = new Command('ATTACK_NEAREST', 'HERO');
         }
@@ -442,13 +453,14 @@ const player = (initialStore, reader) => {
 // const setupAction = readSetup({ readline });
 // store = update(store, setupAction);
 
-//player(store, { readline });
+// player(store, { readline });
 
 export default {
     actionType,
     createMine,
     not,
     combine,
+    isHero,
     readSetup,
     readTurnData,
     transformPrism,
