@@ -22,7 +22,7 @@ class kdbush {
             this.coords[(2 * i) + 1] = getY(points[i]);
         }
 
-        this.sort(this.ids, this.coords, this.nodeSize, 0, this.ids.length - 1, 0);
+        this.sort(0, this.ids.length - 1, 0);
     }
 
     range(minX, minY, maxX, maxY) {
@@ -57,15 +57,11 @@ class kdbush {
             const nextAxis = (axis + 1) % 2;
 
             if (axis === 0 ? minX <= x : minY <= y) {
-                stack.push(left);
-                stack.push(m - 1);
-                stack.push(nextAxis);
+                stack.push(left, m - 1, nextAxis);
             }
 
             if (axis === 0 ? maxX >= x : maxY >= y) {
-                stack.push(m + 1);
-                stack.push(right);
-                stack.push(nextAxis);
+                stack.push(m + 1, right, nextAxis);
             }
         }
 
@@ -103,14 +99,10 @@ class kdbush {
             const nextAxis = (axis + 1) % 2;
 
             if (axis === 0 ? qx - r <= x : qy - r <= y) {
-                stack.push(left);
-                stack.push(m - 1);
-                stack.push(nextAxis);
+                stack.push(left, m - 1, nextAxis);
             }
             if (axis === 0 ? qx + r >= x : qy + r >= y) {
-                stack.push(m + 1);
-                stack.push(right);
-                stack.push(nextAxis);
+                stack.push(m + 1, right, nextAxis);
             }
         }
 
@@ -124,7 +116,6 @@ class kdbush {
 
         this.select(m, left, right, depth % 2);
 
-        console.log(m - 1, depth + 1);
         this.sort(left, m - 1, depth + 1);
         this.sort(m + 1, right, depth + 1);
     }
