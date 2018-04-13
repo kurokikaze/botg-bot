@@ -44,6 +44,26 @@ describe('helper tests', () => {
         const skirmishLinePos2 = bot.skirmishLine([myUnit, myUnit2, enemyUnit, myTower, enemyTower], mine, enemy);
         expect(skirmishLinePos2).toEqual(150);
     });
+
+    it('should correctly work with vectors', () => {
+        const myPoint = {
+            x: 100,
+            y: 100,
+        };
+
+        const directionPoint = {
+            x: 200,
+            y: 200,
+        };
+
+        const calculatedPoint = bot.inDirection(myPoint, directionPoint, 283);
+        const correctPoint = {
+            x: 300,
+            y: 300,
+        };
+
+        expect(calculatedPoint).toEqual(correctPoint, 'Correct distance by angle');
+    });
 });
 
 describe('reader tests', () => {
@@ -325,4 +345,51 @@ describe('logic tests', () => {
 
         expect(receivedCommands).toEqual(defaultCommand, 'Received default command');
     });
+
+    it('should try to use PULL', () => {
+        const units = [
+            myTower,
+            enemyTower,
+            {
+                unitId: 1,
+                unitType: 'HERO',
+                heroType: 'DOCTOR_STRANGE',
+                x: 100,
+                y: 100,
+                mana: 100,
+                countDown3: 0,
+                attackRange: 201,
+                team: myTeam,
+            }, {
+                unitId: 2,
+                unitType: 'HERO',
+                heroType: 'HULK',
+                x: 300,
+                y: 100,
+                mana: 100,
+                countDown3: 0,
+                attackRange: 201,
+                team: enemyTeam,
+            }];
+
+        const state = {
+            config: {
+                myTeam,
+            },
+            game: {
+                turn: 0,
+                gold: 0,
+                enemyGold: 0,
+                roundType: 0,
+            },
+            items: [],
+            mapFeatures: [],
+            units,
+        };
+
+        const [receivedCommands] = bot.generateCommands(bot.transformPrism(state));
+
+        expect(receivedCommands).toEqual('PULL 2; GET OVER HERE', 'Received PULL command');
+    });
+
 });

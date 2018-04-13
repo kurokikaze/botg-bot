@@ -28,6 +28,21 @@ const entityType = {
     spawn: 'SPAWN',
 };
 
+const spells = {
+    blink: {
+        manacost: 16,
+        range: 200,
+    },
+    fireball: {
+        range: 900,
+        manacost: 60,
+    },
+    burning: {
+        range: 250,
+        mana: 50,
+    },
+};
+
 class Command {
     constructor(type, param1 = null, param2 = null, comment = '') {
         this.type = type;
@@ -193,7 +208,7 @@ const median = (values = []) => {
 };
 
 const inDirection = (center, target, distance) => {
-    const angle = Math.atan(target.y - center.y, target.x - center.x);
+    const angle = Math.atan2(target.y - center.y, target.x - center.x);
     const x = Math.round(center.x + (distance * Math.cos(angle)));
     const y = Math.round(center.y + (distance * Math.sin(angle)));
     return { x, y };
@@ -293,10 +308,16 @@ const transformPrism = (originalStore) => {
 
 const ironmanPrism = (state, myHero) => {
     const isGroot = u => u.unitType === unitType.groot;
+    const safeDifference = 100;
     const enemyIsCloser = (unit) => {
         const enemyHeroes = closestTo(unit)(state.prism.enemyHeroes);
         const myHeroes = closestTo(unit)(state.prism.myHeroes);
-        return enemyHeroes.length > 0 && myHeroes.length > 0 && enemyHeroes[0].dist < myHeroes[0].dist;
+        return (
+            enemyHeroes.length > 0 &&
+            myHeroes.length > 0 &&
+            enemyHeroes[0].dist < 290 &&
+            (enemyHeroes[0].dist + safeDifference) < myHeroes[0].dist
+        );
     };
 
     const grootsInReach = state.units.filter(isGroot).filter(gr => dist(myHero, gr) <= 900) || [];
@@ -307,6 +328,28 @@ const ironmanPrism = (state, myHero) => {
         prism: {
             ...state.prism,
             harrassTargets,
+        },
+    };
+    return newState;
+};
+
+const doctorStrangePrism = (state, myHero) => {
+    const healingThreshold = 0.7;
+
+    const otherHeroes = state.prism.myHeroes.filter(h => h.heroType !== 'DOCTOR_STRANGE');
+    const woundedTargets = [...state.prism.myTroops, ...otherHeroes].filter(u => (u.health / u.maxHealth) < healingThreshold);
+    const healingTargets = closestTo(myHero)(woundedTargets).filter(t => t.dist < 250);
+
+    const pullTargets = closestTo(myHero)(state.prism.enemyHeroes).filter(h => h.dist < 250);
+    const pullResults = pullTargets.map(pt => ({ ...pt, pullResult: inDirection(pt, myHero, 200) }));
+    const goodPullResults = pullResults.filter(pr => dist(pr.pullResult, state.prism.myTower) < state.prism.myTower.attackRange);
+
+    const newState = {
+        ...state,
+        prism: {
+            ...state.prism,
+            healingTargets,
+            goodPullResults,
         },
     };
     return newState;
@@ -326,6 +369,8 @@ const generateCommands = (gameData) => {
     const commands = gameData.prism.myHeroes.map((myHero) => {
         const heroInRange = (gameData.prism.enemyHeroes && gameData.prism.enemyHeroes.length > 0) ? inMyRange(myHero)(gameData.prism.enemyHeroes).length > 0 : false;
         const unitsInRange = (gameData.prism.enemyTroops && gameData.prism.enemyTroops.length > 0) ? inMyRange(myHero)(gameData.prism.enemyTroops) : [];
+        const pullerPresent = gameData.prism.enemyHeroes.filter(h => h.heroType === 'DOCTOR_STRANGE' || h.heroType === 'VALKYRIE');
+        const zonaPeligrosa = pullerPresent ? gameData.prism.enemyTower.attackRange + 200 : gameData.prism.enemyTower.attackRange;
 
         if (myHero.heroType === 'IRONMAN' &&
             myHero.mana > 100 &&
@@ -338,7 +383,38 @@ const generateCommands = (gameData) => {
             }
         }
 
-        if (!heroInRange && unitsInRange.length === 0 && gameData.prism.myTroops.length > 0) {
+        if (myHero.heroType === 'DOCTOR_STRANGE' && myHero.mana > 50
+        ) {
+            const prismedState = doctorStrangePrism(gameData, myHero);
+            if (myHero.countDown3 === 0 &&
+                prismedState.prism.goodPullResults.length > 0
+            ) {
+                return (new Command('PULL', prismedState.prism.goodPullResults[0].unitId, null, 'COME GET SOME TOWER')).generate();
+            } else if (
+                (myHero.health / myHero.maxHealth) > 0.5 &&
+                myHero.countDown1 === 0 &&
+                prismedState.prism.healingTargets.length > 0) {
+                const healingTarget = prismedState.prism.healingTargets[0];
+                return (new Command('AOEHEAL', healingTarget.x, healingTarget.y, 'HEROES NEVER DIE')).generate();
+            } else if (
+                (myHero.health / myHero.maxHealth) <= 0.5 &&
+                myHero.countDown2 === 0
+            ) {
+                return (new Command('SHIELD', myHero.unitId, null, 'SHIELDED')).generate();
+            }
+        }
+
+        const whoseTurn = gameData.game.turn % 2 ? 'IRONMAN' : 'DOCTOR_STRANGE';
+        if (dist(myHero, gameData.prism.enemyTower) <= zonaPeligrosa) {
+            const towerSafeSpot = inDirection(gameData.prism.enemyTower, myHero, zonaPeligrosa);
+            const canRetreatAndAttack = dist(myHero, towerSafeSpot) < myHero.movementSpeed * 0.9;
+            const attackableTargets = inMyRange({ ...towerSafeSpot, attackRange: myHero.attackRange })([...gameData.prism.enemyTroops, ...gameData.prism.enemyHeroes]);
+            if (canRetreatAndAttack && attackableTargets.length > 0) {
+                command = new Command('MOVE_ATTACK', `${towerSafeSpot.x} ${towerSafeSpot.y}`, attackableTargets[0].unitId, 'RETREATING WITH STYLE');
+            } else {
+                command = new Command('MOVE', towerSafeSpot.x, towerSafeSpot.y, 'RETREATING');
+            }
+        } else if (!heroInRange && unitsInRange.length === 0 && gameData.prism.myTroops.length > 0 && myHero.heroType === whoseTurn) {
             const lootRating = gameData.prism.purchasable.map(i => ({ name: i.itemName, rating: evaluateLoot(i) }));
             lootRating.sort((a, b) => a.rating >= b.rating);
             if (gameData.prism.purchasable.length > 0 && myHero.itemsOwned < 4) {
@@ -351,15 +427,25 @@ const generateCommands = (gameData) => {
                     y: averageCoord,
                 };
 
-                if (dist(squad, gameData.prism.enemyTower) > gameData.prism.enemyTower.attackRange) {
+                if (dist(squad, gameData.prism.enemyTower) > zonaPeligrosa) {
                     /* if (inTheirRange(squad)(gameData.prism.enemyTroops || []).length > 0) {
                         const saferPosition = closerToHome(squad, dist(myHero, squad) / 2);
                         command = new Command('MOVE', saferPosition, squad.y, 'FOLLOW SQUAD SAFELY');
                     } else { */
-                    command = new Command('MOVE', squad.x, squad.y, 'FOLLOW SQUAD');
+                    const safeToWalk = Math.abs(squad.x, gameData.prism.skirmishLinePos) > 200;
+                    const followPoint = safeToWalk ? inDirection(squad, gameData.prism.enemyTower, 50) : squad;
+                    if (
+                        myHero.heroType === 'IRONMAN' &&
+                        myHero.mana > spells.blink.manacost &&
+                        dist(myHero, followPoint) < spells.blink.range &&
+                        myHero.countDown1 === 0) {
+                        command = new Command('BLINK', followPoint.x, followPoint.y, 'FOLLOW FASTER');
+                    } else {
+                        command = new Command('MOVE', followPoint.x, followPoint.y, 'FOLLOW SQUAD');
+                    }
                     // }
                 } else {
-                    command = new Command('MOVE', closerToHome(gameData.prism.enemyTower, gameData.prism.enemyTower.attackRange + 10), squad.y);
+                    command = new Command('MOVE', closerToHome(gameData.prism.enemyTower, zonaPeligrosa), squad.y);
                 }
             }
         } else if (unitsInRange.length > 0) {
@@ -375,21 +461,33 @@ const generateCommands = (gameData) => {
             const squadLife = lifeCircle(myHero, gameData.prism.myTroops);
 
             if (enemyWeaklings.length > 0) {
-                command = new Command('ATTACK', enemyWeaklings[0].unitId, null, 'ENEMY WEAKLING');
+                const enemyWeakTarget = enemyWeaklings[0];
+                command = new Command('ATTACK', enemyWeakTarget.unitId, null, 'ENEMY WEAKLING');
             } else if (weaklings.length > 0) {
-                command = new Command('ATTACK', weaklings[0].unitId, null, 'WEAKLING');
+                const myWeakTarget = weaklings[0];
+                command = new Command('ATTACK', myWeakTarget.unitId, null, 'WEAKLING');
             } else {
                 const targetDist = dist(myHero, weakTarget);
                 if (
                     myHero.heroType === 'IRONMAN' &&
-                    myHero.mana >= 50 &&
+                    myHero.mana >= spells.burning.mana &&
                     myHero.countDown3 === 0 &&
-                    targetDist <= 250 &&
+                    targetDist <= spells.burning.range &&
                     targetDist > 100
                 ) {
                     command = new Command('BURNING', weakTarget.x, weakTarget.y, 'BURNING');
                 } else if (targetDist <= myHero.attackRange) {
-                    command = new Command('ATTACK', weakTarget.unitId, null, `GENERAL TARGET (${Math.floor(targetDist)}, ${myHero.attackRange}, ${weakTarget.health})`);
+                    if (myHero.heroType === 'DOCTOR_STRANGE' && dist(weakTarget, myHero) <= weakTarget.attackRange) {
+                        const safeShootingSpot = inDirection(weakTarget, myHero, weakTarget.attackRange + 5);
+                        if (dist(myHero, safeShootingSpot) <= myHero.movementSpeed * 0.8) {
+                            command = new Command('MOVE_ATTACK', `${safeShootingSpot.x} ${safeShootingSpot.y}`, weakTarget.unitId, 'SHOOTING FROM DISTANCE');
+                        } else {
+                            const pointInBetween = inDirection(myHero, safeShootingSpot, myHero.movementSpeed * 0.8);
+                            command = new Command('MOVE_ATTACK', `${pointInBetween.x} ${pointInBetween.y}`, weakTarget.unitId, '~SHOOTING FROM DISTANCE');
+                        }
+                    } else {
+                        command = new Command('ATTACK', weakTarget.unitId, null, `GENERAL TARGET (${Math.floor(targetDist)}, ${myHero.attackRange}, ${weakTarget.health})`);
+                    }
                 } else {
                     command = new Command('MOVE', weakTarget.x, weakTarget.y, 'CREEPING CLOSER');
                 }
@@ -433,21 +531,15 @@ const generateCommands = (gameData) => {
         const enemyHeroPercentage = gameData.prism.enemyHero ? (gameData.prism.enemyHero.health / gameData.prism.enemyHero.maxHealth) : 100;
 
         const hulkPresent = gameData.prism.enemyHeroes && gameData.prism.enemyHeroes.find(e => e.heroType === 'HULK');
-        const lifeThreshold = hulkPresent ? pessimisticLifeThreshold : defaultLifeThreshold;
+        const weAreFlimsy = myHero.heroType === 'DOCTOR_STRANGE';
+
+        const reallyPessimistic = (hulkPresent && weAreFlimsy) ? 0.7 : pessimisticLifeThreshold;
+        const lifeThreshold = (hulkPresent || weAreFlimsy) ? reallyPessimistic : defaultLifeThreshold;
 
         if (myHeroPercentage <= lifeThreshold) {
             const healthPotionsForSale = gameData.items.filter(i => i.itemCost <= gameData.game.gold && i.isPotion && i.health);
             if (myHero.health / myHero.maxHealth < lifeThreshold && healthPotionsForSale.length > 0 && myHeroPercentage <= enemyHeroPercentage) {
-                if (myHero.itemsOwned === 4) {
-                    storedItems.sort((a, b) => a.rating <= b.rating);
-                    const lowestItem = storedItems[0];
-                    command = new Command('SELL', lowestItem.name);
-                    command.addAction(() => {
-                        storedItems.shift();
-                    });
-                } else {
-                    command = new Command('BUY', healthPotionsForSale[0].itemName);
-                }
+                command = new Command('BUY', healthPotionsForSale[0].itemName);
             } else if (dist(myHero, gameData.prism.myTower) > 20) {
                 if (myHero.heroType === 'IRONMAN' && myHero.mana > 16 && myHero.countDown1 === 0) {
                     const blinkPoint = inDirection(myHero, gameData.prism.myTower, 199);
@@ -455,6 +547,20 @@ const generateCommands = (gameData) => {
                 } else {
                     command = new Command('MOVE', gameData.prism.myTower.x + 20, gameData.prism.myTower.y, 'TO TOWER');
                 }
+            } else if (
+                myHero.heroType === 'DOCTOR_STRANGE' &&
+                myHero.mana >= 50 &&
+                myHero.countDown1 === 0
+            ) {
+                command = new Command('AOEHEAL', myHero.x, myHero.y, 'HEALING');
+            } else if (
+                myHero.heroType === 'IRONMAN' &&
+                myHero.mana >= spells.fireball.manacost &&
+                myHero.countDown2 === 0 &&
+                inMyRange({ ...myHero, attackRange: spells.fireball.range })(gameData.prism.enemyHeroes).length > 0
+            ) {
+                const burnable = inMyRange({ ...myHero, attackRange: 900 })(gameData.prism.enemyHeroes)[0];
+                command = new Command('FIREBALL', burnable.x, burnable.y, 'HEALING');
             } else if (heroInRange) {
                 command = new Command('ATTACK_NEAREST', 'HERO');
             } else {
@@ -483,20 +589,21 @@ const player = (initialStore, reader) => {
     }
 };
 
-const setupAction = readSetup({ readline });
-store = update(store, setupAction);
+// const setupAction = readSetup({ readline });
+// store = update(store, setupAction);
 
-player(store, { readline });
+// player(store, { readline });
 
-// export default {
-//     actionType,
-//     createMine,
-//     not,
-//     combine,
-//     isHero,
-//     readSetup,
-//     readTurnData,
-//     transformPrism,
-//     generateCommands,
-//     skirmishLine,
-// };
+export default {
+    actionType,
+    createMine,
+    not,
+    combine,
+    inDirection,
+    isHero,
+    readSetup,
+    readTurnData,
+    transformPrism,
+    generateCommands,
+    skirmishLine,
+};
