@@ -254,7 +254,7 @@ const isBush = f => f.entityType === entityType.bush;
 
 const closestTo = center =>
     us =>
-        us.map(iu => ({ ...iu, dist: dist(center, iu) })).sort(((a, b) => a.dist >= b.dist));
+        us.map(iu => ({ ...iu, dist: dist(center, iu) })).sort(((a, b) => a.dist < b.dist));
 
 const inMyRange = shooter =>
     units => units.filter(unit => dist(shooter, unit) < shooter.attackRange);
@@ -340,7 +340,7 @@ const doctorStrangePrism = (state, myHero) => {
     const woundedTargets = [...state.prism.myTroops, ...otherHeroes].filter(u => (u.health / u.maxHealth) < healingThreshold);
     const healingTargets = closestTo(myHero)(woundedTargets).filter(t => t.dist < 250);
 
-    const pullTargets = closestTo(myHero)(state.prism.enemyHeroes).filter(h => h.dist < 250);
+    const pullTargets = closestTo(myHero)(state.prism.enemyHeroes).filter(h => h.dist < 400);
     const pullResults = pullTargets.map(pt => ({ ...pt, pullResult: inDirection(pt, myHero, 200) }));
     const goodPullResults = pullResults.filter(pr => dist(pr.pullResult, state.prism.myTower) < state.prism.myTower.attackRange);
 
@@ -416,7 +416,7 @@ const generateCommands = (gameData) => {
             }
         } else if (!heroInRange && unitsInRange.length === 0 && gameData.prism.myTroops.length > 0 && myHero.heroType === whoseTurn) {
             const lootRating = gameData.prism.purchasable.map(i => ({ name: i.itemName, rating: evaluateLoot(i) }));
-            lootRating.sort((a, b) => a.rating >= b.rating);
+            lootRating.sort((a, b) => a.rating <= b.rating);
             if (gameData.prism.purchasable.length > 0 && myHero.itemsOwned < 4) {
                 command = new Command('BUY', lootRating[0].name);
                 command.addAction(() => storedItems.push(lootRating[0]));
@@ -426,8 +426,17 @@ const generateCommands = (gameData) => {
                     x: median(gameData.prism.myTroops.map(u => u.x)),
                     y: averageCoord,
                 };
+                const braveSoldier = closestTo(gameData.prism.enemyTower)(gameData.prism.myTroops)[0];
 
-                if (dist(squad, gameData.prism.enemyTower) > zonaPeligrosa) {
+                if (dist(gameData.prism.enemyTower, braveSoldier) < dist(gameData.prism.enemyTower, squad)) {
+                    const arrivalPoint = inDirection(myHero, braveSoldier, myHero.movementSpeed * 0.8);
+                    const arrivalTargets = inMyRange({ ...arrivalPoint, attackRange: myHero.attackRange })([...gameData.prism.enemyTroops, ...gameData.prism.enemyHeroes]);
+                    if (arrivalTargets.length > 0) {
+                        command = new Command('MOVE_ATTACK', `${arrivalPoint.x} ${arrivalPoint.y}`, arrivalTargets[0].unitId, 'RAMBO STYLE');
+                    } else {
+                        command = new Command('MOVE', braveSoldier.x, braveSoldier.y, 'FOLLOW FRONTLINE');
+                    }
+                } else if (dist(squad, gameData.prism.enemyTower) > zonaPeligrosa) {
                     /* if (inTheirRange(squad)(gameData.prism.enemyTroops || []).length > 0) {
                         const saferPosition = closerToHome(squad, dist(myHero, squad) / 2);
                         command = new Command('MOVE', saferPosition, squad.y, 'FOLLOW SQUAD SAFELY');
@@ -449,7 +458,7 @@ const generateCommands = (gameData) => {
                 }
             }
         } else if (unitsInRange.length > 0) {
-            const weakTarget = unitsInRange.sort((a, b) => a.health >= b.health)[0];
+            const weakTarget = unitsInRange.sort((a, b) => a.health > b.health)[0];
             const enemyWeaklings = inMyRange(myHero)(gameData.prism.enemyTroops);
             // const enemyWeaklings = gameData.prism.enemyTroops.map(unit => ({ ...unit, range: dist(myHero, unit) })).filter(inRangeAndWeak);
             const weaklings = gameData.prism.myTroops.map(unit => ({ ...unit, range: dist(myHero, unit) })).filter(unit => unit.range <= myHero.attackRange && unit.health <= myHero.attackDamage);
@@ -511,15 +520,15 @@ const generateCommands = (gameData) => {
                 }
             }
         } else if (heroInRange) {
-            const pullTarget = inMyRange(myHero)(gameData.prism.enemyHeroes)[0];
+            const pullableTargets = inMyRange({ ...myHero, attackRange: 400 })(gameData.prism.enemyHeroes);
 
             if (
                 myHero.heroType === 'DOCTOR_STRANGE' &&
                 myHero.mana > 50 &&
                 myHero.countDown3 === 0 &&
-                dist(myHero, pullTarget) <= 400
+                pullableTargets.length > 0
             ) {
-                command = new Command('PULL', pullTarget.unitId, null, 'GET OVER HERE');
+                command = new Command('PULL', pullableTargets[0].unitId, null, 'GET OVER HERE');
             } else {
                 command = new Command('ATTACK_NEAREST', 'HERO', null, 'CHAAAARGE');
             }
@@ -537,7 +546,7 @@ const generateCommands = (gameData) => {
         const lifeThreshold = (hulkPresent || weAreFlimsy) ? reallyPessimistic : defaultLifeThreshold;
 
         if (myHeroPercentage <= lifeThreshold) {
-            const healthPotionsForSale = gameData.items.filter(i => i.itemCost <= gameData.game.gold && i.isPotion && i.health);
+            const healthPotionsForSale = gameData.items.filter(i => i.itemCost <= gameData.game.gold && i.isPotion && i.health && !i.mana).sort((i1, i2) => i1.health <= i2.health);
             if (myHero.health / myHero.maxHealth < lifeThreshold && healthPotionsForSale.length > 0 && myHeroPercentage <= enemyHeroPercentage) {
                 command = new Command('BUY', healthPotionsForSale[0].itemName);
             } else if (dist(myHero, gameData.prism.myTower) > 20) {
@@ -560,7 +569,7 @@ const generateCommands = (gameData) => {
                 inMyRange({ ...myHero, attackRange: spells.fireball.range })(gameData.prism.enemyHeroes).length > 0
             ) {
                 const burnable = inMyRange({ ...myHero, attackRange: 900 })(gameData.prism.enemyHeroes)[0];
-                command = new Command('FIREBALL', burnable.x, burnable.y, 'HEALING');
+                command = new Command('FIREBALL', burnable.x, burnable.y, 'HEALFIREBALLING');
             } else if (heroInRange) {
                 command = new Command('ATTACK_NEAREST', 'HERO');
             } else {
