@@ -221,10 +221,10 @@ const combine = (f1, f2) => t => f1(t) && f2(t);
 const not = fn => function() { return !fn.apply(null, arguments) };
 
 const createMine = state => u => u.team === state.config.myTeam;
-const mine = createMine(store);
 
 const isHero = u => u.unitType === unitType.hero;
 const isUnit = u => u.unitType === unitType.unit;
+const isGroot = u => u.unitType === unitType.groot;
 const isTower = u => u.unitType === unitType.tower;
 
 const dist = (a, b) => Math.sqrt(((a.x - b.x) ** 2) + ((a.y - b.y) ** 2));
@@ -233,28 +233,24 @@ const lcoord = objects => objects.reduce((o1, best) => (o1.x < best ? o1.x : bes
 const rightmost = objects => (objects.length > 0 ? rcoord(objects) : null);
 const leftmost = objects => (objects.length > 0 ? lcoord(objects) : null);
 
-const evaluateLoot = item => ((item.damage * 3) + (item.maxHealth * 2));
+const evaluateLoot = item => ((item.damage * 3) + (item.maxHealth * 2) + (item.manaRegeneration * 4));
 
 const lifeCircle = (hero, units) => units.filter(u =>
     dist(hero, u) <= 140).reduce((s, u) => s + u.health, 0);
 
-const skirmishLine = (units, localMine, localEnemy) => {
-    const myUnits = units.filter(combine(localMine, isUnit));
-    const theirUnits = units.filter(combine(localEnemy, isUnit));
-
-    const myTower = units.find(localMine, isTower);
-    const enemyTower = units.find(combine(localEnemy, isTower));
-
-    const myRightmost = myUnits.length ? rightmost(myUnits) : myTower.x;
-    const theirLeftmost = theirUnits.length ? leftmost(theirUnits) : enemyTower.x;
-    return (myRightmost.x + theirLeftmost.x) / 2;
-};
-
-const isBush = f => f.entityType === entityType.bush;
-
 const closestTo = center =>
     us =>
         us.map(iu => ({ ...iu, dist: dist(center, iu) })).sort(((a, b) => a.dist < b.dist));
+
+const createOnSpawn = state => groot => state.mapFeatures.filter(mf => mf.entityType === entityType.spawn).find(mf => mf.x === groot.x && mf.y === groot.y);
+
+const calculateSkirmishLine = (myUnits, enemyUnits, myTower, enemyTower) => {
+    const myFarthest = (myUnits.length > 0) ? closestTo(enemyTower)(myUnits)[0] : myTower;
+    const theirFarthest = (enemyUnits.length > 0) ? closestTo(myTower)(enemyUnits)[0] : enemyTower;
+    return Math.floor((myFarthest.x + theirFarthest.x) / 2);
+};
+
+const isBush = f => f.entityType === entityType.bush;
 
 const inMyRange = shooter =>
     units => units.filter(unit => dist(shooter, unit) < shooter.attackRange);
@@ -263,10 +259,7 @@ const inMyRange = shooter =>
 const inTheirRange = target =>
     units => units.filter(unit => dist(target, unit) < unit.attackRange);
 
-const skirmishInProgress = (units) => {
-    const mineUnits = units.filter(combine(mine, isUnit));
-    const enemyUnits = units.filter(combine(mine, isUnit));
-
+const skirmishInProgress = (mineUnits, enemyUnits) => {
     // Нет юнитов - нет схватки. Замес у башни не рассматриваем.
     if (mineUnits.length === 0 || enemyUnits.length === 0) return false;
 
@@ -286,28 +279,45 @@ const pessimisticLifeThreshold = 0.5;
 const transformPrism = (originalStore) => {
     const localMine = createMine(originalStore);
     const localEnemy = not(localMine);
+    const onSpawn = createOnSpawn(originalStore);
+
+    const enemyHero = originalStore.units.find(combine(localEnemy, isHero));
+
+    const myTower = originalStore.units.find(combine(localMine, isTower));
+    const myHeroes = originalStore.units.filter(combine(localMine, isHero));
+    const myTroops = originalStore.units.filter(combine(localMine, isUnit));
+    const wanderingGroots = originalStore.units.filter(combine(isGroot, not(onSpawn)));
+
+    const enemyHeroes = originalStore.units.filter(combine(localEnemy, isHero));
+    const enemyTroops = originalStore.units.filter(combine(localEnemy, isUnit));
+    const enemyTower = originalStore.units.find(combine(localEnemy, isTower));
+
+    const aggressiveGroots = originalStore.units.find(u => u.unitType === 'GROOT');
+    const purchasable = originalStore.items.filter(i => i.itemCost <= originalStore.game.gold && !i.isPotion).filter(i => storedItems.findIndex(si => si.name === i.itemName) === -1);
+
+    const skirmishLinePos = calculateSkirmishLine(myTroops, enemyTroops, myTower, enemyTower);
+    const skirmishIsOn = skirmishInProgress(myTroops, enemyTroops);
+
     return {
         ...originalStore,
         prism: {
-            enemyHero: originalStore.units.find(combine(localEnemy, isHero)),
-
-            myTower: originalStore.units.find(combine(localMine, isTower)),
-            myHeroes: originalStore.units.filter(combine(localMine, isHero)),
-            myTroops: originalStore.units.filter(combine(localMine, isUnit)),
-
-            enemyHeroes: originalStore.units.filter(combine(localEnemy, isHero)),
-            enemyTroops: originalStore.units.filter(combine(localEnemy, isUnit)),
-            enemyTower: originalStore.units.find(combine(localEnemy, isTower)),
-
-            purchasable: originalStore.items.filter(i => i.itemCost <= originalStore.game.gold && !i.isPotion).filter(i => storedItems.findIndex(si => si.name === i.itemName) === -1),
-            skirmishLinePos: skirmishLine(originalStore.units, localMine, localEnemy),
-            skirmishIsOn: skirmishInProgress(originalStore.units),
+            aggressiveGroots,
+            enemyHero,
+            myTower,
+            myHeroes,
+            myTroops,
+            enemyHeroes,
+            enemyTroops,
+            enemyTower,
+            purchasable,
+            skirmishLinePos,
+            skirmishIsOn,
+            wanderingGroots,
         },
     };
 };
 
 const ironmanPrism = (state, myHero) => {
-    const isGroot = u => u.unitType === unitType.groot;
     const safeDifference = 100;
     const enemyIsCloser = (unit) => {
         const enemyHeroes = closestTo(unit)(state.prism.enemyHeroes);
@@ -486,7 +496,7 @@ const generateCommands = (gameData) => {
                 ) {
                     command = new Command('BURNING', weakTarget.x, weakTarget.y, 'BURNING');
                 } else if (targetDist <= myHero.attackRange) {
-                    if (myHero.heroType === 'DOCTOR_STRANGE' && dist(weakTarget, myHero) <= weakTarget.attackRange) {
+                    if (dist(weakTarget, myHero) <= weakTarget.attackRange) {
                         const safeShootingSpot = inDirection(weakTarget, myHero, weakTarget.attackRange + 5);
                         if (dist(myHero, safeShootingSpot) <= myHero.movementSpeed * 0.8) {
                             command = new Command('MOVE_ATTACK', `${safeShootingSpot.x} ${safeShootingSpot.y}`, weakTarget.unitId, 'SHOOTING FROM DISTANCE');
@@ -614,5 +624,5 @@ export default {
     readTurnData,
     transformPrism,
     generateCommands,
-    skirmishLine,
+    calculateSkirmishLine,
 };

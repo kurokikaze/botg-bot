@@ -26,22 +26,16 @@ describe('helper tests', () => {
     it('should calculate skirmish line', () => {
         const myTeam = 0;
         const notMyTeam = myTeam + 1;
-        const testState = {
-            config: {
-                myTeam,
-            },
-        };
-        const mine = bot.createMine(testState);
-        const enemy = bot.not(mine);
+
         const myUnit = { team: myTeam, x: 100, unitType: 'UNIT' };
         const myUnit2 = { team: myTeam, x: 100, unitType: 'UNIT' };
         const enemyUnit = { team: notMyTeam, x: 200, unitType: 'UNIT' };
         const myTower = { team: myTeam, x: 100, unitType: 'TOWER' };
         const enemyTower = { team: notMyTeam, x: 200, unitType: 'TOWER' };
 
-        const skirmishLinePos = bot.skirmishLine([myUnit, enemyUnit, myTower, enemyTower], mine, enemy);
+        const skirmishLinePos = bot.calculateSkirmishLine([myUnit], [enemyUnit], myTower, enemyTower);
         expect(skirmishLinePos).toEqual(150);
-        const skirmishLinePos2 = bot.skirmishLine([myUnit, myUnit2, enemyUnit, myTower, enemyTower], mine, enemy);
+        const skirmishLinePos2 = bot.calculateSkirmishLine([myUnit, myUnit2], [enemyUnit], myTower, enemyTower);
         expect(skirmishLinePos2).toEqual(150);
     });
 
@@ -176,6 +170,29 @@ describe('reader tests', () => {
         };
 
         expect(defaultItemsAction).toEqual(expectedItemsAction, 'Simple items state ok');
+    });
+});
+
+describe('prism tests', () => {
+    const myTeam = 0;
+
+    const defaultState = {
+        config: {
+            myTeam,
+        },
+        game: {
+            turn: 0,
+            gold: 0,
+            enemyGold: 0,
+            roundType: 0,
+        },
+        items: [],
+        mapFeatures: [],
+        units: [],
+    };
+
+    it('should find and report wandering groots', () => {
+        //
     });
 });
 
