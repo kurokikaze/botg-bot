@@ -40,7 +40,7 @@ class kdbush {
                 for (let i = left; i <= right; i += 1) {
                     x = this.coords[2 * i];
                     y = this.coords[(2 * i) + 1];
-                    if (x >= minX && x <= maxX && y >= minY && y <= maxY) result.push(this.ids[i]);
+                    if (x >= minX && x <= maxX && y >= minY && y <= maxY) result.push(this.points[this.ids[i]]);
                 }
 
                 // eslint-disable-next-line no-continue
@@ -52,7 +52,7 @@ class kdbush {
             x = this.coords[2 * m];
             y = this.coords[(2 * m) + 1];
 
-            if (x >= minX && x <= maxX && y >= minY && y <= maxY) result.push(this.ids[m]);
+            if (x >= minX && x <= maxX && y >= minY && y <= maxY) result.push(this.points[this.ids[m]]);
 
             const nextAxis = (axis + 1) % 2;
 
@@ -83,7 +83,7 @@ class kdbush {
 
             if (right - left <= this.nodeSize) {
                 for (let i = left; i <= right; i += 1) {
-                    if (sqDist(this.coords[2 * i], this.coords[(2 * i) + 1], qx, qy) <= r2) result.push(this.ids[i]);
+                    if (sqDist(this.coords[2 * i], this.coords[(2 * i) + 1], qx, qy) <= r2) result.push(this.points[this.ids[i]]);
                 }
                 // eslint-disable-next-line no-continue
                 continue;
@@ -94,7 +94,7 @@ class kdbush {
             const x = this.coords[2 * m];
             const y = this.coords[(2 * m) + 1];
 
-            if (sqDist(x, y, qx, qy) <= r2) result.push(this.ids[m]);
+            if (sqDist(x, y, qx, qy) <= r2) result.push(this.points[this.ids[m]]);
 
             const nextAxis = (axis + 1) % 2;
 
