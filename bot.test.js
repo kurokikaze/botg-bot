@@ -121,6 +121,75 @@ describe('Command class tests', () => {
     });
 });
 
+describe('state reducer tests', () => {
+    it('should apply initial data action', () => {
+        const testTeam = 6;
+        const testItems = ['1', '2'];
+        const testMapFeatures = ['a', 'b'];
+
+        const initialDataAction = {
+            type: bot.actionType.initialData,
+            myTeam: testTeam,
+            items: testItems,
+            mapFeatures: testMapFeatures,
+        };
+
+        const resultState = bot.update({}, initialDataAction);
+        const targetState = {
+            config: {
+                myTeam: testTeam,
+            },
+            items: testItems,
+            mapFeatures: testMapFeatures,
+        };
+
+        expect(resultState).toEqual(targetState);
+    });
+
+    it('should apply turn data action', () => {
+        const testGold = 11;
+        const testEnemyGold = 15;
+        const startingTurn = 3;
+        const testRoundType = 4;
+        const testUnits = ['u1', 'u2'];
+
+        const tickUpdateAction = {
+            type: bot.actionType.tickUpdate,
+            gold: testGold,
+            enemyGold: testEnemyGold,
+            roundType: testRoundType,
+            units: testUnits,
+        };
+
+        const initialState = {
+            game: {
+                turn: startingTurn,
+                gold: 0,
+                enemyGold: 0,
+                roundType: 0,
+            },
+            units: [],
+        };
+
+        const resultState = bot.update(initialState, tickUpdateAction);
+        const targetState = {
+            game: {
+                turn: startingTurn + 1,
+                gold: testGold,
+                enemyGold: testEnemyGold,
+                roundType: testRoundType,
+            },
+            units: testUnits,
+        };
+
+        expect(resultState).toEqual(targetState);
+    });
+
+    it('should apply custom data action', () => {
+
+    });
+});
+
 describe('reader tests', () => {
     /*
         int myteam

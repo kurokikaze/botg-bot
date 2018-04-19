@@ -381,9 +381,9 @@ const heroPrism = (state, myHero) => {
             unitsInRange,
             pullerPresent,
             zonaPeligrosa,
-        }
-    }
-}
+        },
+    };
+};
 
 const generateCommands = (gameData) => {
     const closingSign = u => Math.sign(gameData.prism.myTower.x - u.x);
@@ -640,6 +640,7 @@ export default {
     createMine,
     not,
     combine,
+    update,
     inDirection,
     isHero,
     readSetup,
