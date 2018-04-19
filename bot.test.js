@@ -23,7 +23,7 @@ describe('helper tests', () => {
         expect(enemy(enemyUnit)).toEqual(true);
     });
 
-    it('should calculate skirmish line', () => {
+    it.skip('should calculate skirmish line', () => {
         const myTeam = 0;
         const notMyTeam = myTeam + 1;
 
@@ -191,7 +191,7 @@ describe('prism tests', () => {
         units: [],
     };
 
-    it('should find and report wandering groots', () => {
+    it.skip('should find and report wandering groots', () => {
         //
     });
 });
@@ -269,6 +269,86 @@ describe('logic tests', () => {
         const [receivedCommands] = bot.generateCommands(bot.transformPrism(state));
 
         expect(receivedCommands).toEqual('PULL 2; GET OVER HERE', 'Received PULL command');
+    });
+
+    it('should try to blink in tower direction if low on health (Ironman)', () => {
+        const units = [
+            myTower,
+            enemyTower,
+            {
+                unitId: 1,
+                unitType: 'HERO',
+                heroType: 'IRONMAN',
+                x: 300,
+                y: 430,
+                mana: 100,
+                health: 1,
+                maxHealth: 100,
+                countDown1: 0,
+                countDown2: 0,
+                countDown3: 0,
+                attackRange: 201,
+                team: myTeam,
+            }];
+
+        const state = {
+            config: {
+                myTeam,
+            },
+            game: {
+                turn: 0,
+                gold: 0,
+                enemyGold: 0,
+                roundType: 0,
+            },
+            items: [],
+            mapFeatures: [],
+            units,
+        };
+
+        const [receivedCommands] = bot.generateCommands(bot.transformPrism(state));
+
+        expect(receivedCommands).toEqual('BLINK 101 430; BLINK TO TOWER', 'Blinking to tower when low on health');
+    });
+
+    it('should try to blink to tower without overshooting if low on health (Ironman)', () => {
+        const units = [
+            myTower,
+            enemyTower,
+            {
+                unitId: 1,
+                unitType: 'HERO',
+                heroType: 'IRONMAN',
+                x: 100,
+                y: 430,
+                mana: 100,
+                health: 1,
+                maxHealth: 100,
+                countDown1: 0,
+                countDown2: 0,
+                countDown3: 0,
+                attackRange: 201,
+                team: myTeam,
+            }];
+
+        const state = {
+            config: {
+                myTeam,
+            },
+            game: {
+                turn: 0,
+                gold: 0,
+                enemyGold: 0,
+                roundType: 0,
+            },
+            items: [],
+            mapFeatures: [],
+            units,
+        };
+
+        const [receivedCommands] = bot.generateCommands(bot.transformPrism(state));
+
+        expect(receivedCommands).toEqual('BLINK 0 430; BLINK TO TOWER', 'Blinking to tower when low on health');
     });
 
     it('shouldnt try to use PULL when low on mana', () => {
@@ -363,7 +443,7 @@ describe('logic tests', () => {
         expect(receivedCommands).toEqual(defaultCommand, 'Received default command');
     });
 
-    it('should show tower-pullable targets', () => {
+    it('should try to pull enemy heroes into tower fire', () => {
         const units = [
             myTower,
             enemyTower,
@@ -408,7 +488,6 @@ describe('logic tests', () => {
 
         expect(receivedCommands).toEqual('PULL 2; GET OVER HERE', 'Received PULL command');
     });
-
 
     it('should try to use PULL', () => {
         const units = [
