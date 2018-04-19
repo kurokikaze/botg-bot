@@ -284,10 +284,12 @@ const transformPrism = (originalStore) => {
     const myHeroes = originalStore.units.filter(combine(localMine, isHero));
     const myTroops = originalStore.units.filter(combine(localMine, isUnit));
     const wanderingGroots = originalStore.units.filter(combine(isGroot, not(onSpawn)));
+    const myHeroesTotal = myHeroes.reduce((el, total) => total + el.health, 0);
 
     const enemyHeroes = originalStore.units.filter(combine(localEnemy, isHero));
     const enemyTroops = originalStore.units.filter(combine(localEnemy, isUnit));
     const enemyTower = originalStore.units.find(combine(localEnemy, isTower));
+    const enemyHeroesTotal = enemyHeroes.reduce((el, total) => total + el.health, 0);
 
     const aggressiveGroots = originalStore.units.find(u => u.unitType === unitType.groot);
     const purchasable = originalStore.items.filter(i => i.itemCost <= originalStore.game.gold && !i.isPotion).filter(i => storedItems.findIndex(si => si.name === i.itemName) === -1);
@@ -313,6 +315,8 @@ const transformPrism = (originalStore) => {
             skirmishLinePos,
             skirmishIsOn,
             wanderingGroots,
+            myHeroesTotal,
+            enemyHeroesTotal,
         },
     };
 };
@@ -562,10 +566,14 @@ const generateCommands = (gameData) => {
 
         const reallyPessimistic = (hulkPresent && weAreFlimsy) ? veryPessimisticLifeThreshold : pessimisticLifeThreshold;
         const lifeThreshold = (hulkPresent || weAreFlimsy) ? reallyPessimistic : defaultLifeThreshold;
+        const weAreLeading = gameData.prism.myHeroesTotal > gameData.prism.enemyHeroesTotal * 2;
 
-        if (myHeroPercentage <= lifeThreshold) {
+        if (myHeroPercentage <= lifeThreshold && !weAreLeading) {
             const healthPotionsForSale = gameData.items.filter(i => i.itemCost <= gameData.game.gold && i.isPotion && i.health && !i.mana).sort((i1, i2) => i1.health <= i2.health);
             const distToTower = dist(myHero, gameData.prism.myTower);
+            const hasEnemy = gameData.prism.enemyTroops.length > 0;
+            const weaklingInRange = hasEnemy ? inMyRange(myHero)(gameData.prism.enemyTroops).sort((a, b) => a.health > b.health)[0] : false;
+
             if (myHero.health / myHero.maxHealth < lifeThreshold && healthPotionsForSale.length > 0 && myHeroPercentage <= enemyHeroPercentage) {
                 command = new Command('BUY', healthPotionsForSale[0].itemName);
             } else if (distToTower > 20) {
@@ -587,8 +595,11 @@ const generateCommands = (gameData) => {
                 myHero.countDown2 === 0 &&
                 inMyRange({ ...myHero, attackRange: spells.fireball.range })(gameData.prism.enemyHeroes).length > 0
             ) {
-                const burnable = inMyRange({ ...myHero, attackRange: 900 })(gameData.prism.enemyHeroes)[0];
-                command = new Command('FIREBALL', burnable.x, burnable.y, 'HEALFIREBALLING');
+                const fireballable = inMyRange({ ...myHero, attackRange: spells.fireball.range })(gameData.prism.enemyHeroes)[0];
+                command = new Command('FIREBALL', fireballable.x, fireballable.y, 'HEALFIREBALLING');
+            } else if (weaklingInRange) {
+                const weakTarget = unitsInRange.sort((a, b) => a.health > b.health)[0];
+                command = new Command('ATTACK', weaklingInRange.unitId, null, "WHILE WE'RE HERE...");
             } else if (heroInRange) {
                 command = new Command('ATTACK_NEAREST', 'HERO');
             } else {
@@ -617,12 +628,14 @@ const player = (initialStore, reader) => {
     }
 };
 
-// const setupAction = readSetup({ readline });
-// store = update(store, setupAction);
+if (typeof readline === 'function') {
+    const setupAction = readSetup({ readline });
+    store = update(store, setupAction);
 
-// player(store, { readline });
+    player(store, { readline });
+}
 
-export default {
+module.exports = {
     Command,
     actionType,
     createMine,
