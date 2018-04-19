@@ -478,7 +478,7 @@ describe('logic tests', () => {
 
         const [receivedCommands] = bot.generateCommands(bot.transformPrism(state));
 
-        expect(receivedCommands).toEqual('PULL 2; GET OVER HERE', 'Received PULL command');
+        expect(receivedCommands.generate()).toEqual('PULL 2; GET OVER HERE', 'Received PULL command');
     });
 
     it('should try to blink in tower direction if low on health (Ironman)', () => {
@@ -518,7 +518,7 @@ describe('logic tests', () => {
 
         const [receivedCommands] = bot.generateCommands(bot.transformPrism(state));
 
-        expect(receivedCommands).toEqual('BLINK 101 430; BLINK TO TOWER', 'Blinking to tower when low on health');
+        expect(receivedCommands.generate()).toEqual('BLINK 101 430; BLINK TO TOWER', 'Blinking to tower when low on health');
     });
 
     it('should try to blink to tower without overshooting if low on health (Ironman)', () => {
@@ -558,7 +558,7 @@ describe('logic tests', () => {
 
         const [receivedCommands] = bot.generateCommands(bot.transformPrism(state));
 
-        expect(receivedCommands).toEqual('BLINK 0 430; BLINK TO TOWER', 'Blinking to tower when low on health');
+        expect(receivedCommands.generate()).toEqual('BLINK 0 430; BLINK TO TOWER', 'Blinking to tower when low on health');
     });
 
     it('shouldnt try to use PULL when low on mana', () => {
@@ -602,9 +602,9 @@ describe('logic tests', () => {
             units,
         };
 
-        const [receivedCommands] = bot.generateCommands(bot.transformPrism(state));
+        const [receivedCommand] = bot.generateCommands(bot.transformPrism(state));
 
-        expect(receivedCommands).toEqual(defaultCommand, 'Received default command');
+        expect(receivedCommand.generate()).toEqual(defaultCommand, 'Received default command');
     });
 
     it('shouldnt try to use PULL when cooldown still up', () => {
@@ -648,9 +648,9 @@ describe('logic tests', () => {
             units,
         };
 
-        const [receivedCommands] = bot.generateCommands(bot.transformPrism(state));
+        const [receivedCommand] = bot.generateCommands(bot.transformPrism(state));
 
-        expect(receivedCommands).toEqual(defaultCommand, 'Received default command');
+        expect(receivedCommand.generate()).toEqual(defaultCommand, 'Received default command');
     });
 
     it('should try to pull enemy heroes into tower fire', () => {
@@ -694,9 +694,9 @@ describe('logic tests', () => {
             units,
         };
 
-        const [receivedCommands] = bot.generateCommands(bot.transformPrism(state));
+        const [receivedCommand] = bot.generateCommands(bot.transformPrism(state));
 
-        expect(receivedCommands).toEqual('PULL 2; GET OVER HERE', 'Received PULL command');
+        expect(receivedCommand.generate()).toEqual('PULL 2; GET OVER HERE', 'Received PULL command');
     });
 
     it('should try to use PULL', () => {
@@ -742,6 +742,120 @@ describe('logic tests', () => {
 
         const [receivedCommands] = bot.generateCommands(bot.transformPrism(state));
 
-        expect(receivedCommands).toEqual('PULL 2; GET OVER HERE', 'Received PULL command');
+        expect(receivedCommands.generate()).toEqual('PULL 2; GET OVER HERE', 'Received PULL command');
+    });
+
+    it('should try to backstep when attacking', () => {
+        const units = [
+            myTower,
+            enemyTower,
+            {
+                unitId: 1,
+                unitType: 'HERO',
+                heroType: 'IRONMAN',
+                x: 100,
+                y: 100,
+                mana: 1,
+                countDown3: 0,
+                movementSpeed: 50,
+                attackRange: 250,
+                team: myTeam,
+            }, {
+                unitId: 2,
+                unitType: 'UNIT',
+                heroType: 0,
+                x: 300,
+                y: 100,
+                mana: 100,
+                countDown3: 0,
+                attackRange: 210,
+                team: enemyTeam,
+            }, {
+                unitId: 3,
+                unitType: 'UNIT',
+                heroType: 0,
+                x: 260,
+                y: 100,
+                mana: 100,
+                countDown3: 0,
+                attackRange: 210,
+                team: myTeam,
+            }];
+
+        const state = {
+            config: {
+                myTeam,
+            },
+            game: {
+                turn: 0,
+                gold: 0,
+                enemyGold: 0,
+                roundType: 0,
+            },
+            items: [],
+            mapFeatures: [],
+            units,
+        };
+
+        const [receivedCommands] = bot.generateCommands(bot.transformPrism(state));
+
+        expect(receivedCommands.generate()).toEqual('MOVE_ATTACK 85 100 2; SHOOTING FROM DISTANCE', 'Backstepping');
+    });
+
+    it('should try to backstep when attacking (not enough distance)', () => {
+        const units = [
+            myTower,
+            enemyTower,
+            {
+                unitId: 1,
+                unitType: 'HERO',
+                heroType: 'IRONMAN',
+                x: 100,
+                y: 100,
+                mana: 1,
+                countDown3: 0,
+                movementSpeed: 50,
+                attackRange: 250,
+                team: myTeam,
+            }, {
+                unitId: 2,
+                unitType: 'UNIT',
+                heroType: 0,
+                x: 300,
+                y: 100,
+                mana: 100,
+                countDown3: 0,
+                attackRange: 310,
+                team: enemyTeam,
+            }, {
+                unitId: 3,
+                unitType: 'UNIT',
+                heroType: 0,
+                x: 260,
+                y: 100,
+                mana: 100,
+                countDown3: 0,
+                attackRange: 210,
+                team: myTeam,
+            }];
+
+        const state = {
+            config: {
+                myTeam,
+            },
+            game: {
+                turn: 0,
+                gold: 0,
+                enemyGold: 0,
+                roundType: 0,
+            },
+            items: [],
+            mapFeatures: [],
+            units,
+        };
+
+        const [receivedCommands] = bot.generateCommands(bot.transformPrism(state));
+
+        expect(receivedCommands.generate()).toEqual('MOVE_ATTACK 60 100 2; ~SHOOTING FROM DISTANCE', 'Backstepping');
     });
 });

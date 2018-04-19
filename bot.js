@@ -1,4 +1,4 @@
-/* global print, printErr, readline */
+/* global print, readline */
 // eslint-disable-next-line prefer-const
 let store = {
     config: {},
@@ -14,6 +14,7 @@ const actionType = {
     initialData: 'initialData',
     tickUpdate: 'tickUpdate',
     customData: 'customData',
+    markUnit: 'markUnit',
 };
 
 const heroType = {
@@ -55,28 +56,7 @@ const spells = {
     },
 };
 
-class Command {
-    constructor(type, param1 = null, param2 = null, comment = '') {
-        this.type = type;
-        this.param1 = param1;
-        this.param2 = param2;
-        this.comment = comment;
-    }
-
-    generate() {
-        if (this.action) this.action();
-
-        const commandBody = [
-            this.type,
-            this.param1,
-            this.param2,
-        ].filter(part => part !== '' && part !== null).map(c => c.toString()).join(' ');
-
-        return this.comment ? `${commandBody}; ${this.comment}` : commandBody;
-    }
-
-    addAction(callback) { this.action = callback; }
-}
+const markUnit = (units, id) => units.map(u => ((u.unitId === id) ? u : ({ ...u, marked: true })));
 
 const reducer = (state, action) => {
     switch (action.type) {
@@ -101,6 +81,12 @@ const reducer = (state, action) => {
             units: action.units,
         };
     }
+    case actionType.markUnit: {
+        return {
+            ...state,
+            units: markUnit(state.units, action.unitId),
+        };
+    }
     case actionType.customData: {
         const newState = Object.assign(state, {
             custom: {
@@ -116,6 +102,35 @@ const reducer = (state, action) => {
 };
 
 const update = (state, action) => reducer(state, action);
+
+class Command {
+    constructor(type, param1 = null, param2 = null, comment = '') {
+        this.type = type;
+        this.param1 = param1;
+        this.param2 = param2;
+        this.comment = comment;
+    }
+
+    generate(store) {
+        if (this.action) {
+            if (typeof this.action === 'function') {
+                this.action();
+            } else {
+                store = update(store, action);
+            }            
+        }
+
+        const commandBody = [
+            this.type,
+            this.param1,
+            this.param2,
+        ].filter(part => part !== '' && part !== null).map(c => c.toString()).join(' ');
+
+        return this.comment ? `${commandBody}; ${this.comment}` : commandBody;
+    }
+
+    addAction(callback) { this.action = callback; }
+}
 
 // Readers
 const readSetup = ({ readline }) => {
@@ -392,9 +407,9 @@ const generateCommands = (gameData) => {
     const closerToHome = (u, distance) => (u.x + (closingSign(u) * distance));
 
     if (gameData.game.roundType === -2) {
-        return [heroType.doctorStrange];
+        return [new Command(heroType.doctorStrange)];
     } else if (gameData.game.roundType === -1) {
-        return [heroType.ironman];
+        return [new Command(heroType.ironman)];
     }
 
     // eslint-disable-next-line
@@ -411,7 +426,7 @@ const generateCommands = (gameData) => {
             const prismedState = ironmanPrism(gameData, myHero);
             if (prismedState.prism.harrassTargets.length > 0) {
                 const harrassTarget = closestTo(myHero)(prismedState.prism.harrassTargets)[0];
-                return (new Command('FIREBALL', harrassTarget.x, harrassTarget.y, 'HOW DO YOU LIKE THAT')).generate();
+                return (new Command('FIREBALL', harrassTarget.x, harrassTarget.y, 'HOW DO YOU LIKE THAT'));
             }
         }
 
@@ -421,18 +436,18 @@ const generateCommands = (gameData) => {
             if (myHero.countDown3 === 0 &&
                 prismedState.prism.goodPullResults.length > 0
             ) {
-                return (new Command('PULL', prismedState.prism.goodPullResults[0].unitId, null, 'COME GET SOME TOWER')).generate();
+                return (new Command('PULL', prismedState.prism.goodPullResults[0].unitId, null, 'COME GET SOME TOWER'));
             } else if (
                 (myHero.health / myHero.maxHealth) > 0.5 &&
                 myHero.countDown1 === 0 &&
                 prismedState.prism.healingTargets.length > 0) {
                 const healingTarget = prismedState.prism.healingTargets[0];
-                return (new Command('AOEHEAL', healingTarget.x, healingTarget.y, 'HEROES NEVER DIE')).generate();
+                return (new Command('AOEHEAL', healingTarget.x, healingTarget.y, 'HEROES NEVER DIE'));
             } else if (
                 (myHero.health / myHero.maxHealth) <= 0.5 &&
                 myHero.countDown2 === 0
             ) {
-                return (new Command('SHIELD', myHero.unitId, null, 'SHIELDED')).generate();
+                return (new Command('SHIELD', myHero.unitId, null, 'SHIELDED'));
             }
         }
 
@@ -497,8 +512,6 @@ const generateCommands = (gameData) => {
 
             const closestBushes = closestTo(myHero)(gameData.mapFeatures.filter(isBush));
 
-            if (gameData.prism.skirmishIsOn) { printErr('Skirmish in progress at', gameData.prism.skirmishIsOn); }
-
             const squadLife = lifeCircle(myHero, gameData.prism.myTroops);
 
             if (
@@ -516,6 +529,12 @@ const generateCommands = (gameData) => {
                 } else {
                     const pointInBetween = inDirection(myHero, safeShootingSpot, myHero.movementSpeed * 0.8);
                     command = new Command('MOVE_ATTACK', `${pointInBetween.x} ${pointInBetween.y}`, weakTarget.unitId, '~SHOOTING FROM DISTANCE');
+                }
+                if (weakTarget.health < myHero.attackDamage) {
+                    command.addAction({
+                        type: actionType.markUnit,
+                        unitId: weakTarget.unitId,
+                    });
                 }
             } else if (weaklings.length > 0) {
                 const myWeakTarget = weaklings[0];
@@ -566,7 +585,7 @@ const generateCommands = (gameData) => {
 
         const reallyPessimistic = (hulkPresent && weAreFlimsy) ? veryPessimisticLifeThreshold : pessimisticLifeThreshold;
         const lifeThreshold = (hulkPresent || weAreFlimsy) ? reallyPessimistic : defaultLifeThreshold;
-        const weAreLeading = gameData.prism.myHeroesTotal > gameData.prism.enemyHeroesTotal * 2;
+        const weAreLeading = gameData.prism.myHeroesTotal > gameData.prism.enemyHeroesTotal * 1.5;
 
         if (myHeroPercentage <= lifeThreshold && !weAreLeading) {
             const healthPotionsForSale = gameData.items.filter(i => i.itemCost <= gameData.game.gold && i.isPotion && i.health && !i.mana).sort((i1, i2) => i1.health <= i2.health);
@@ -598,7 +617,6 @@ const generateCommands = (gameData) => {
                 const fireballable = inMyRange({ ...myHero, attackRange: spells.fireball.range })(gameData.prism.enemyHeroes)[0];
                 command = new Command('FIREBALL', fireballable.x, fireballable.y, 'HEALFIREBALLING');
             } else if (weaklingInRange) {
-                const weakTarget = unitsInRange.sort((a, b) => a.health > b.health)[0];
                 command = new Command('ATTACK', weaklingInRange.unitId, null, "WHILE WE'RE HERE...");
             } else if (heroInRange) {
                 command = new Command('ATTACK_NEAREST', 'HERO');
@@ -606,7 +624,7 @@ const generateCommands = (gameData) => {
                 command = new Command('WAIT');
             }
         }
-        return command.generate();
+        return command;
     });
 
     return commands;
@@ -624,7 +642,7 @@ const player = (initialStore, reader) => {
 
         const transformedStore = transformPrism(playerStore);
         const commands = generateCommands(transformedStore);
-        commands.forEach(com => print(com));
+        commands.forEach(com => print(com.generate()));
     }
 };
 
