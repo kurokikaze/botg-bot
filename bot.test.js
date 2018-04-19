@@ -122,6 +122,33 @@ describe('Command class tests', () => {
 });
 
 describe('state reducer tests', () => {
+    it('should not apply actions of unknown type', () => {
+        const testTeam = 6;
+        const testItems = ['1', '2'];
+        const testMapFeatures = ['a', 'b'];
+
+        const incorrectAction = {
+            type: 'wrongActionType',
+            myTeam: testTeam,
+            items: testItems,
+            mapFeatures: testMapFeatures,
+        };
+
+        const initialState = {
+            game: {
+                turn: 14,
+                gold: 0,
+                enemyGold: 0,
+                roundType: 0,
+            },
+            units: [],
+        };
+
+        const resultState = bot.update(initialState, incorrectAction);
+
+        expect(resultState).toEqual(initialState);
+    });
+
     it('should apply initial data action', () => {
         const testTeam = 6;
         const testItems = ['1', '2'];
