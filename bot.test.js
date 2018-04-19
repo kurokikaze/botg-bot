@@ -23,6 +23,18 @@ describe('helper tests', () => {
         expect(enemy(enemyUnit)).toEqual(true);
     });
 
+    it('should evaluate loot', () => {
+        // damage: 3, maxHealth: 2, manaRegen: 4
+        const itemToEval = {
+            damage: 10,
+            maxMana: 50,
+            maxHealth: 20,
+            manaRegeneration: 5,
+        };
+
+        expect(bot.evaluateLoot(itemToEval)).toEqual((10 * 3) + (20 * 2) + (5 * 4));
+    });
+
     // Теперь считается через позиции авангардов
     it.skip('should calculate skirmish line', () => {
         const myTeam = 0;
@@ -287,6 +299,47 @@ describe('reader tests', () => {
             isPotion: parseInt(inputs[9], 10),
         }
         */
+    it('should parse items', () => {
+        const mockReadline = jest.fn(() => '')
+            .mockImplementationOnce(() => '0')
+            .mockImplementationOnce(() => '0')
+            .mockImplementationOnce(() => '2')
+            .mockImplementationOnce(() => 'testItem1 120 1 0 4 0 6 7 8 0')
+            .mockImplementationOnce(() => 'testPotion1 40 0 12 0 13 0 0 0 1');
+
+        const defaultItemsAction = bot.readSetup({ readline: mockReadline });
+        const expectedItemsAction = {
+            type: bot.actionType.initialData,
+            myTeam: 0,
+            mapFeatures: [],
+            items: [{
+                itemName: 'testItem1',
+                itemCost: 120,
+                damage: 1,
+                health: 0,
+                maxHealth: 4,
+                mana: 0,
+                maxMana: 6,
+                moveSpeed: 7,
+                manaRegeneration: 8,
+                isPotion: 0,
+            },
+            {
+                itemName: 'testPotion1',
+                itemCost: 40,
+                damage: 0,
+                health: 12,
+                maxHealth: 0,
+                mana: 13,
+                maxMana: 0,
+                moveSpeed: 0,
+                manaRegeneration: 0,
+                isPotion: 1,
+            }],
+        };
+
+        expect(defaultItemsAction).toEqual(expectedItemsAction, 'Simple items state ok');
+    });
     it('should parse items', () => {
         const mockReadline = jest.fn(() => '')
             .mockImplementationOnce(() => '0')

@@ -1,7 +1,4 @@
 /* global print, printErr, readline */
-
-import KDBush from './kdbush';
-
 // eslint-disable-next-line prefer-const
 let store = {
     config: {},
@@ -368,6 +365,7 @@ const doctorStrangePrism = (state, myHero) => {
     return newState;
 };
 
+/* eslint-disable-next-line no-unused-vars */
 const heroPrism = (state, myHero) => {
     const heroInRange = (state.prism.enemyHeroes && state.prism.enemyHeroes.length > 0) ? inMyRange(myHero)(state.prism.enemyHeroes).length > 0 : false;
     const unitsInRange = (state.prism.enemyTroops && state.prism.enemyTroops.length > 0) ? inMyRange(myHero)(state.prism.enemyTroops) : [];
@@ -489,9 +487,9 @@ const generateCommands = (gameData) => {
             }
         } else if (unitsInRange.length > 0) {
             const weakTarget = unitsInRange.sort((a, b) => a.health > b.health)[0];
-            const enemyWeaklings = inMyRange(myHero)(gameData.prism.enemyTroops);
-            // const enemyWeaklings = gameData.prism.enemyTroops.map(unit => ({ ...unit, range: dist(myHero, unit) })).filter(inRangeAndWeak);
+
             const weaklings = gameData.prism.myTroops.map(unit => ({ ...unit, range: dist(myHero, unit) })).filter(unit => unit.range <= myHero.attackRange && unit.health <= myHero.attackDamage);
+            const targetDist = dist(myHero, weakTarget);
 
             const closestBushes = closestTo(myHero)(gameData.mapFeatures.filter(isBush));
 
@@ -499,37 +497,27 @@ const generateCommands = (gameData) => {
 
             const squadLife = lifeCircle(myHero, gameData.prism.myTroops);
 
-            if (enemyWeaklings.length > 0) {
-                const enemyWeakTarget = enemyWeaklings[0];
-                command = new Command('ATTACK', enemyWeakTarget.unitId, null, 'ENEMY WEAKLING');
+            if (
+                myHero.heroType === heroType.ironman &&
+                myHero.mana >= spells.burning.mana &&
+                myHero.countDown3 === 0 &&
+                targetDist <= spells.burning.range &&
+                targetDist > 100
+            ) {
+                command = new Command('BURNING', weakTarget.x, weakTarget.y, 'BURNING');
+            } else if (targetDist <= weakTarget.attackRange) {
+                const safeShootingSpot = inDirection(weakTarget, myHero, weakTarget.attackRange + 5);
+                if (dist(myHero, safeShootingSpot) <= myHero.movementSpeed * 0.8) {
+                    command = new Command('MOVE_ATTACK', `${safeShootingSpot.x} ${safeShootingSpot.y}`, weakTarget.unitId, 'SHOOTING FROM DISTANCE');
+                } else {
+                    const pointInBetween = inDirection(myHero, safeShootingSpot, myHero.movementSpeed * 0.8);
+                    command = new Command('MOVE_ATTACK', `${pointInBetween.x} ${pointInBetween.y}`, weakTarget.unitId, '~SHOOTING FROM DISTANCE');
+                }
             } else if (weaklings.length > 0) {
                 const myWeakTarget = weaklings[0];
-                command = new Command('ATTACK', myWeakTarget.unitId, null, 'WEAKLING');
+                command = new Command('ATTACK', myWeakTarget.unitId, null, 'MY OWN WEAKLING');
             } else {
-                const targetDist = dist(myHero, weakTarget);
-                if (
-                    myHero.heroType === heroType.ironman &&
-                    myHero.mana >= spells.burning.mana &&
-                    myHero.countDown3 === 0 &&
-                    targetDist <= spells.burning.range &&
-                    targetDist > 100
-                ) {
-                    command = new Command('BURNING', weakTarget.x, weakTarget.y, 'BURNING');
-                } else if (targetDist <= myHero.attackRange) {
-                    if (dist(weakTarget, myHero) <= weakTarget.attackRange) {
-                        const safeShootingSpot = inDirection(weakTarget, myHero, weakTarget.attackRange + 5);
-                        if (dist(myHero, safeShootingSpot) <= myHero.movementSpeed * 0.8) {
-                            command = new Command('MOVE_ATTACK', `${safeShootingSpot.x} ${safeShootingSpot.y}`, weakTarget.unitId, 'SHOOTING FROM DISTANCE');
-                        } else {
-                            const pointInBetween = inDirection(myHero, safeShootingSpot, myHero.movementSpeed * 0.8);
-                            command = new Command('MOVE_ATTACK', `${pointInBetween.x} ${pointInBetween.y}`, weakTarget.unitId, '~SHOOTING FROM DISTANCE');
-                        }
-                    } else {
-                        command = new Command('ATTACK', weakTarget.unitId, null, `GENERAL TARGET (${Math.floor(targetDist)}, ${myHero.attackRange}, ${weakTarget.health})`);
-                    }
-                } else {
-                    command = new Command('MOVE', weakTarget.x, weakTarget.y, 'CREEPING CLOSER');
-                }
+                command = new Command('ATTACK', weakTarget.unitId, null, 'GENERAL TARGET');
             }
 
             const safeSpot = (closestBushes.length > 0) ? closestBushes[0] : gameData.prism.myTower;
@@ -641,6 +629,7 @@ export default {
     not,
     combine,
     update,
+    evaluateLoot,
     inDirection,
     isHero,
     readSetup,
