@@ -23,12 +23,13 @@ describe('helper tests', () => {
         expect(enemy(enemyUnit)).toEqual(true);
     });
 
+    // Теперь считается через позиции авангардов
     it.skip('should calculate skirmish line', () => {
         const myTeam = 0;
         const notMyTeam = myTeam + 1;
 
         const myUnit = { team: myTeam, x: 100, unitType: 'UNIT' };
-        const myUnit2 = { team: myTeam, x: 100, unitType: 'UNIT' };
+        const myUnit2 = { team: myTeam, x: 90, unitType: 'UNIT' };
         const enemyUnit = { team: notMyTeam, x: 200, unitType: 'UNIT' };
         const myTower = { team: myTeam, x: 100, unitType: 'TOWER' };
         const enemyTower = { team: notMyTeam, x: 200, unitType: 'TOWER' };
@@ -57,6 +58,66 @@ describe('helper tests', () => {
         };
 
         expect(calculatedPoint).toEqual(correctPoint, 'Correct distance by angle');
+    });
+
+    it('should do after-actions when generating command', () => {
+        let testCounter = 0;
+
+        const testCommand = new bot.Command('TEST', 'A', 'B')
+        testCommand.addAction(() => {
+            testCounter += 1;
+        });
+
+        expect(testCounter).toEqual(0, 'action is added but not performed');
+        testCommand.generate();
+        expect(testCounter).toEqual(1, 'action is performed on generation');        
+    });
+});
+
+describe('Command class tests', () => {
+    it('should generate command without parameters', () => {
+        const testCommand = new bot.Command('STARTUP');
+        const output = testCommand.generate();
+        expect(output).toEqual('STARTUP', 'no-parameter command is generated correctly');
+    });
+
+    it('should generate command with one parameter', () => {
+        const testCommand = new bot.Command('FETCH', 'UNITS');
+        const output = testCommand.generate();
+        expect(output).toEqual('FETCH UNITS', 'one-parameter command is generated correctly');
+    });
+
+    it('should generate command with two parameters', () => {
+        const testCommand = new bot.Command('AIRSTRIKE', 10, 22);
+        const output = testCommand.generate();
+        expect(output).toEqual('AIRSTRIKE 10 22', 'two-parameter command is generated correctly');
+    });
+
+    it('should correcty add comments to commands', () => {
+        const testCommandNone = new bot.Command('STARTUP', null, null, 'STARTING');
+        const outputNone = testCommandNone.generate();
+        expect(outputNone).toEqual('STARTUP; STARTING', 'no-parameter command is generated correctly');
+
+        const testCommandOne = new bot.Command('FETCH', 'UNITS', null, 'REQUESTING');
+        const outputOne = testCommandOne.generate();
+        expect(outputOne).toEqual('FETCH UNITS; REQUESTING', 'one-parameter command is generated correctly');
+
+        const testCommandTwo = new bot.Command('AIRSTRIKE', 10, 22, 'GOODBYE');
+        const outputTwo = testCommandTwo.generate();
+        expect(outputTwo).toEqual('AIRSTRIKE 10 22; GOODBYE', 'two-parameter command is generated correctly');
+    });
+
+    it('should do after-actions when generating command', () => {
+        let testCounter = 0;
+
+        const testCommand = new bot.Command('TEST', 'A', 'B');
+        testCommand.addAction(() => {
+            testCounter += 1;
+        });
+
+        expect(testCounter).toEqual(0, 'action is added but not performed');
+        testCommand.generate();
+        expect(testCounter).toEqual(1, 'action is performed on generation');
     });
 });
 

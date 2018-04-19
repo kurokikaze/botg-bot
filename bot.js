@@ -635,6 +635,7 @@ const player = (initialStore, reader) => {
 // player(store, { readline });
 
 export default {
+    Command,
     actionType,
     createMine,
     not,
