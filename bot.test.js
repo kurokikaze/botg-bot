@@ -433,7 +433,7 @@ describe('logic tests', () => {
         team: enemyTeam,
     };
 
-    const defaultCommand = 'ATTACK_NEAREST HERO; CHAAAARGE';
+    const defaultCommand = 'ATTACK_NEAREST HERO';
 
     it('should try to use PULL', () => {
         const units = [
@@ -478,7 +478,7 @@ describe('logic tests', () => {
 
         const [receivedCommands] = bot.generateCommands(bot.transformPrism(state));
 
-        expect(receivedCommands.generate()).toEqual('PULL 2; GET OVER HERE', 'Received PULL command');
+        expect(receivedCommands).toEqual('PULL 2; GET OVER HERE', 'Received PULL command');
     });
 
     it('should try to blink in tower direction if low on health (Ironman)', () => {
@@ -518,7 +518,7 @@ describe('logic tests', () => {
 
         const [receivedCommands] = bot.generateCommands(bot.transformPrism(state));
 
-        expect(receivedCommands.generate()).toEqual('BLINK 101 430; BLINK TO TOWER', 'Blinking to tower when low on health');
+        expect(receivedCommands).toEqual('BLINK 101 430; BLINK TO TOWER', 'Blinking to tower when low on health');
     });
 
     it('should try to blink to tower without overshooting if low on health (Ironman)', () => {
@@ -558,7 +558,7 @@ describe('logic tests', () => {
 
         const [receivedCommands] = bot.generateCommands(bot.transformPrism(state));
 
-        expect(receivedCommands.generate()).toEqual('BLINK 0 430; BLINK TO TOWER', 'Blinking to tower when low on health');
+        expect(receivedCommands).toEqual('BLINK 0 430; BLINK TO TOWER', 'Blinking to tower when low on health');
     });
 
     it('shouldnt try to use PULL when low on mana', () => {
@@ -604,7 +604,7 @@ describe('logic tests', () => {
 
         const [receivedCommand] = bot.generateCommands(bot.transformPrism(state));
 
-        expect(receivedCommand.generate()).toEqual(defaultCommand, 'Received default command');
+        expect(receivedCommand).toEqual(defaultCommand, 'Received default command');
     });
 
     it('shouldnt try to use PULL when cooldown still up', () => {
@@ -650,7 +650,7 @@ describe('logic tests', () => {
 
         const [receivedCommand] = bot.generateCommands(bot.transformPrism(state));
 
-        expect(receivedCommand.generate()).toEqual(defaultCommand, 'Received default command');
+        expect(receivedCommand).toEqual(defaultCommand, 'Received default command');
     });
 
     it('should try to pull enemy heroes into tower fire', () => {
@@ -696,7 +696,7 @@ describe('logic tests', () => {
 
         const [receivedCommand] = bot.generateCommands(bot.transformPrism(state));
 
-        expect(receivedCommand.generate()).toEqual('PULL 2; GET OVER HERE', 'Received PULL command');
+        expect(receivedCommand).toEqual('PULL 2; GET OVER HERE', 'Received PULL command');
     });
 
     it('should try to use PULL', () => {
@@ -742,7 +742,7 @@ describe('logic tests', () => {
 
         const [receivedCommands] = bot.generateCommands(bot.transformPrism(state));
 
-        expect(receivedCommands.generate()).toEqual('PULL 2; GET OVER HERE', 'Received PULL command');
+        expect(receivedCommands).toEqual('PULL 2; GET OVER HERE', 'Received PULL command');
     });
 
     it('should try to backstep when attacking', () => {
@@ -799,7 +799,7 @@ describe('logic tests', () => {
 
         const [receivedCommands] = bot.generateCommands(bot.transformPrism(state));
 
-        expect(receivedCommands.generate()).toEqual('MOVE_ATTACK 85 100 2; SHOOTING FROM DISTANCE', 'Backstepping');
+        expect(receivedCommands).toEqual('MOVE_ATTACK 85 100 2; SHOOTING FROM DISTANCE', 'Backstepping');
     });
 
     it('should try to backstep when attacking (not enough distance)', () => {
@@ -856,6 +856,6 @@ describe('logic tests', () => {
 
         const [receivedCommands] = bot.generateCommands(bot.transformPrism(state));
 
-        expect(receivedCommands.generate()).toEqual('MOVE_ATTACK 60 100 2; ~SHOOTING FROM DISTANCE', 'Backstepping');
+        expect(receivedCommands).toEqual('MOVE_ATTACK 60 100 2; ~SHOOTING FROM DISTANCE', 'Backstepping');
     });
 });
