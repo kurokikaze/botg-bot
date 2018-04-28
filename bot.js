@@ -116,8 +116,8 @@ class Command {
             if (typeof this.action === 'function') {
                 this.action();
             } else {
-                store = update(store, action);
-            }            
+                store = update(store, this.action);
+            }
         }
 
         const commandBody = [
@@ -435,7 +435,7 @@ const generateCommands = (gameData) => {
             myHero.heroType === heroType.ironman &&
             myHero.mana > 100 &&
             myHero.countDown2 === 0
-        )
+        );
 
         if (canPerformFireball) {
             const prismedState = ironmanPrism(gameData, myHero);
@@ -529,7 +529,7 @@ const generateCommands = (gameData) => {
             const weakTarget = unitsInRange.filter(u => !alreadyMarkedUnits.includes(u.unitId)).sort((a, b) => a.health > b.health)[0];
 
             const weaklings = gameData.prism.myTroops.map(unit => ({ ...unit, range: dist(myHero, unit) })).filter(unit => unit.range <= myHero.attackRange && unit.health <= myHero.attackDamage);
-            const targetDist = dist(myHero, weakTarget);
+            const targetDist = weakTarget ? dist(myHero, weakTarget) : 5000;
 
             const closestBushes = closestTo(myHero)(gameData.mapFeatures.filter(isBush));
 
@@ -593,7 +593,8 @@ const generateCommands = (gameData) => {
 
         const reallyPessimistic = (hulkPresent && weAreFlimsy) ? veryPessimisticLifeThreshold : pessimisticLifeThreshold;
         const lifeThreshold = (hulkPresent || weAreFlimsy) ? reallyPessimistic : defaultLifeThreshold;
-        const weAreLeading = gameData.prism.myHeroesTotal > gameData.prism.enemyHeroesTotal * 1.5;
+        const onlyDoctorLeft = gameData.prism.enemyHeroes.length === 1 && gameData.prism.enemyHeroes[0].heroType === heroType.doctorStrange;
+        const weAreLeading = gameData.prism.myHeroesTotal > gameData.prism.enemyHeroesTotal * 1.5 || onlyDoctorLeft;
 
         if (myHeroPercentage <= lifeThreshold && !weAreLeading) {
             const healthPotionsForSale = gameData.items.filter(i => i.itemCost <= gameData.game.gold && i.isPotion && i.health && !i.mana).sort((i1, i2) => i1.health <= i2.health);
