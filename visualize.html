@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<style>
+
+.point {
+  fill: #000;
+  fill-opacity: 0.4;
+}
+
+.range-tower {
+  fill: #1010ff;
+  fill-opacity: 0.2;
+}
+
+.range-tower-enemy {
+  fill: #ff1010;
+  fill-opacity: 0.2;
+}
+
+.range-ironman {
+  fill: #2020dd;
+  fill-opacity: 0.2;
+}
+
+.range-doctor_strange {
+  fill: #2020dd;
+  fill-opacity: 0.2;
+}
+
+.tower {
+  fill: #1010ff;
+  fill-opacity: 0.8;
+}
+
+.tower-enemy {
+  fill: #ff1010;
+  fill-opacity: 0.8;
+}
+
+.range-tower-enemy {
+  fill: #ff1010;
+  fill-opacity: 0.2;
+}
+
+.creep {
+  fill: #20dd20;
+  fill-opacity: 0.8;
+}
+
+.range-creep {
+  fill: #20dd20;
+  fill-opacity: 0.2;
+}
+
+.ironman {
+  fill: #2020dd;
+  fill-opacity: 0.8;
+}
+
+.doctor_strange {
+  fill: #2020dd;
+  fill-opacity: 0.8;
+}
+
+.ironman {
+  fill: #2020dd;
+  fill-opacity: 0.8;
+}
+
+.doctor_strange {
+  fill: #2020dd;
+  fill-opacity: 0.8;
+}
+
+.point--scanned {
+  fill: orange;
+  fill-opacity: 1;
+  stroke: orange;
+  stroke-width: 3px;
+}
+
+.point--selected {
+  fill: red;
+  fill-opacity: 1;
+  stroke: red;
+  stroke-width: 5px;
+}
+
+.node {
+  fill: none;
+  stroke: #ccc;
+  shape-rendering: crispEdges;
+}
+
+</style>
+<svg width="1920" height="750"></svg>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script>
+
+var svg = d3.select("svg"),
+    width = +svg.attr("width"),
+    height = +svg.attr("height"),
+    selected;
+
+var random = Math.random,
+    data = d3.range(2500).map(function() { return [random() * width, random() * height]; });
+
+var quadtree = d3.quadtree()
+    .extent([[-1, -1], [width + 1, height + 1]])
+    .addAll(data);
+
+var entities = [{
+	x: 100,
+	y: 540,
+	name: 'Tower',
+	className: 'tower',
+	attackRange: 400,
+},
+{
+	x: 1820,
+	y: 540,
+	name: 'Tower',
+	className: 'tower-enemy',
+	attackRange: 400,
+},
+{
+	x: 428,
+	y: 490,
+	name: 'Ironman',
+	className: 'ironman',
+	attackRange: 270,
+},
+{
+	x: 599,
+	y: 572,
+	name: 'Doctor Strange',
+	className: 'doctor_strange',
+	attackRange: 245,
+},
+{
+	x: 1820,
+	y: 540,
+	name: 'Tower',
+	className: 'tower',
+	attackRange: 400,
+},
+{
+	x: 610,
+	y: 490,
+	name: 'Melee creep',
+	className: 'creep',
+	attackRange: 90,
+},
+{
+	x: 610,
+	y: 540,
+	name: 'Melee creep',
+	className: 'creep',
+	attackRange: 90,
+},
+{
+	x: 610,
+	y: 590,
+	name: 'Melee creep',
+	className: 'creep',
+	attackRange: 90,
+},
+{
+	x: 560,
+	y: 490,
+	name: 'Ranged creep',
+	className: 'creep',
+	attackRange: 300,
+}]
+	
+var brush = d3.brush()
+    .on("brush", brushed);
+
+var ranges = svg.selectAll(".entity")
+  .data(entities)
+  .enter().append("circle")
+    .attr("class", e => "range-" + (e.className || "tower"))
+    .attr("cx", entity => entity.x)
+    .attr("cy", entity => entity.y)
+    .attr("r", entity => entity.attackRange);
+
+var units = svg.selectAll(".entity")
+  .data(entities)
+  .enter().append("circle")
+    .attr("class", e => (e.className || "tower"))
+    .attr("cx", entity => entity.x)
+    .attr("cy", entity => entity.y)
+    .attr("r", 20);
+
+
+function brushed() {
+  var extent = d3.event.selection;
+  point.each(function(d) { d.scanned = d.selected = false; });
+  search(quadtree, extent[0][0], extent[0][1], extent[1][0], extent[1][1]);
+  point.classed("point--scanned", function(d) { return d.scanned; });
+  point.classed("point--selected", function(d) { return d.selected; });
+}
+
+// Find the nodes within the specified rectangle.
+function search(quadtree, x0, y0, x3, y3) {
+  quadtree.visit(function(node, x1, y1, x2, y2) {
+    if (!node.length) {
+      do {
+        var d = node.data;
+        d.scanned = true;
+        d.selected = (d[0] >= x0) && (d[0] < x3) && (d[1] >= y0) && (d[1] < y3);
+      } while (node = node.next);
+    }
+    return x1 >= x3 || y1 >= y3 || x2 < x0 || y2 < y0;
+  });
+}
+
+// Collapse the quadtree into an array of rectangles.
+function nodes(quadtree) {
+  var nodes = [];
+  quadtree.visit(function(node, x0, y0, x1, y1) {
+    node.x0 = x0, node.y0 = y0;
+    node.x1 = x1, node.y1 = y1;
+    nodes.push(node);
+  });
+  return nodes;
+}
+
+</script>
