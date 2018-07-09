@@ -126,13 +126,14 @@ class Command {
         this.comment = comment;
     }
 
-    generate(store) {
+    generate(/* store */) {
         if (this.action) {
             if (typeof this.action === 'function') {
                 this.action();
-            } else {
-                store = update(store, this.action);
             }
+            // } else {
+            //     store = update(store, this.action);
+            // }
         }
 
         const commandBody = [
@@ -599,7 +600,7 @@ const generateCommands = (gameData) => {
             command = new Command('PULL', sortedPullable[0].unitId, null, 'GET OVER HERE');
         } else if (unitsInRange.length > 0) {
             const weakTarget = unitsInRange.filter(u => !alreadyMarkedUnits.includes(u.unitId)).sort((a, b) => a.health > b.health)[0];
-            const rangedTarget = unitsInRange.filter(u => !alreadyMarkedUnits.includes(u.unitId)).sort((a, b) => a.health > b.health)[0];
+            // const rangedTarget = unitsInRange.filter(u => !alreadyMarkedUnits.includes(u.unitId)).sort((a, b) => a.health > b.health)[0];
 
             const weaklings = gameData.prism.myTroops.map(unit => ({ ...unit, range: dist(myHero, unit) })).filter(unit => unit.range <= myHero.attackRange && unit.health <= myHero.attackDamage);
             const targetDist = weakTarget ? dist(myHero, weakTarget) : 5000;
@@ -673,7 +674,7 @@ const generateCommands = (gameData) => {
             if (gameData.prism.myTroops.length > 0) {
                 const squadX = median(gameData.prism.myTroops.filter(unit => dist(myHero, unit) > 140).map(u => u.x));
                 const squadY = Math.floor(gameData.prism.myTroops.map(u => u.y).reduce((p, c) => p + c, 0) / gameData.prism.myTroops.length);
-                const spotBehindSquad = inDirection({x: squadX, y: squadY}, gameData.prism.myTower, 50);
+                const spotBehindSquad = inDirection({ x: squadX, y: squadY }, gameData.prism.myTower, 50);
                 command = new Command('MOVE', spotBehindSquad.x, spotBehindSquad.y, 'FOLLOW SQUAD CAREFULLY');
             } else {
                 command = new Command('MOVE', gameData.prism.myTower.x, gameData.prism.myTower.y, 'FALL BACK');
