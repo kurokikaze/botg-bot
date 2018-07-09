@@ -478,7 +478,7 @@ describe('logic tests', () => {
 
         const [receivedCommands] = bot.generateCommands(bot.transformPrism(state));
 
-        expect(receivedCommands).toEqual('PULL 2; GET OVER HERE', 'Received PULL command');
+        expect(receivedCommands).toEqual('PULL 2; COME GET SOME TOWER', 'Received PULL command');
     });
 
     it('should try to blink in tower direction if low on health (Ironman)', () => {
@@ -696,7 +696,7 @@ describe('logic tests', () => {
 
         const [receivedCommand] = bot.generateCommands(bot.transformPrism(state));
 
-        expect(receivedCommand).toEqual('PULL 2; GET OVER HERE', 'Received PULL command');
+        expect(receivedCommand).toEqual('PULL 2; COME GET SOME TOWER', 'Received PULL command');
     });
 
     it('should try to use PULL', () => {
@@ -742,7 +742,7 @@ describe('logic tests', () => {
 
         const [receivedCommands] = bot.generateCommands(bot.transformPrism(state));
 
-        expect(receivedCommands).toEqual('PULL 2; GET OVER HERE', 'Received PULL command');
+        expect(receivedCommands).toEqual('PULL 2; COME GET SOME TOWER', 'Received PULL command');
     });
 
     it('should try to backstep when attacking', () => {
